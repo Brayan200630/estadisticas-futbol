@@ -65,61 +65,111 @@ def buscar_equipo(nombre):
     print("RESPUESTA SEARCH:")
     print(datos)
 
-    resultados = datos.get(
-        "results",
-        []
-    )
+    resultados = datos.get("results", [])
 
     print("RESULTADOS ENCONTRADOS:", len(resultados))
 
-    # Coincidencia exacta
+    # ========================================================
+    # BUSCAR EQUIPO
+    # ========================================================
+
+    candidatos = []
+
     for resultado in resultados:
 
-        entidad = resultado.get(
-            "entity",
-            {}
-        )
+        entidad = resultado.get("entity", {})
 
-        nombre_encontrado = entidad.get(
-            "name",
-            ""
-        )
+        if not entidad:
+            continue
+
+        nombre_encontrado = entidad.get("name", "")
+
+        tipo = resultado.get("type", "")
 
         print(
-            "Equipo encontrado:",
+            "Resultado:",
+            tipo,
+            "|",
             nombre_encontrado
         )
 
-        if (
-            nombre_encontrado.lower()
-            == nombre.lower()
-        ):
+        # Solo nos interesan equipos
+        if tipo == "team":
 
-            return entidad
+            candidatos.append(entidad)
 
-    # Coincidencia parcial
-    for resultado in resultados:
+    # ========================================================
+    # COINCIDENCIA EXACTA
+    # ========================================================
 
-        entidad = resultado.get(
-            "entity",
-            {}
-        )
+    for equipo in candidatos:
 
-        nombre_encontrado = entidad.get(
+        nombre_encontrado = equipo.get(
             "name",
             ""
         )
 
         if (
-            nombre.lower()
-            in nombre_encontrado.lower()
+            nombre_encontrado.strip().lower()
+            == nombre.strip().lower()
         ):
 
-            return entidad
+            print(
+                "COINCIDENCIA EXACTA:",
+                nombre_encontrado
+            )
+
+            return equipo
+
+    # ========================================================
+    # COINCIDENCIA PARCIAL
+    # ========================================================
+
+    nombre_buscado = nombre.strip().lower()
+
+    for equipo in candidatos:
+
+        nombre_encontrado = equipo.get(
+            "name",
+            ""
+        ).strip().lower()
+
+        if (
+            nombre_buscado in nombre_encontrado
+            or
+            nombre_encontrado in nombre_buscado
+        ):
+
+            print(
+                "COINCIDENCIA PARCIAL:",
+                equipo.get("name")
+            )
+
+            return equipo
+
+    # ========================================================
+    # NO ENCONTRADO
+    # ========================================================
+
+    print(
+        "NO SE ENCONTRÓ EL EQUIPO:",
+        nombre
+    )
+
+    print(
+        "EQUIPOS DISPONIBLES:"
+    )
+
+    for equipo in candidatos:
+
+        print(
+            "-",
+            equipo.get("name"),
+            "| ID:",
+            equipo.get("id")
+        )
 
     return None
-
-
 
 # ============================================================
 # OBTENER FECHA
