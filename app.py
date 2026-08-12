@@ -38,7 +38,7 @@ equipo_a = st.text_input(
 
 equipo_b = st.text_input(
     "Equipo B",
-    placeholder="Ejemplo: Sporting Cristal"
+    placeholder="Ejemplo: Alianza Lima"
 )
 
 
@@ -445,9 +445,9 @@ if st.button(
     )
 
     st.caption(
-        f"Se muestran únicamente enfrentamientos entre "
-        f"{nombre_a} y {nombre_b}, disputados en "
-        f"{liga}, antes del {fecha_partido.strftime('%d/%m/%Y')}."
+        f"Últimos enfrentamientos entre "
+        f"{nombre_a} y {nombre_b} en {liga}, "
+        f"anteriores al {fecha_partido.strftime('%d/%m/%Y')}."
     )
 
 
@@ -457,14 +457,35 @@ if st.button(
     )
 
 
+    # ========================================================
+    # IMPORTANTE:
+    #
+    # h2h[0] = enfrentamiento más reciente
+    # h2h[1] = enfrentamiento anterior
+    #
+    # NO se modifica la orientación del partido.
+    #
+    # Si Sofascore devuelve:
+    #
+    # Universitario vs Alianza Lima
+    #
+    # se muestra así.
+    #
+    # Si devuelve:
+    #
+    # Alianza Lima vs Universitario
+    #
+    # se muestra así.
+    # ========================================================
+
     if h2h:
 
-        # ----------------------------------------------------
-        # ÚLTIMO H2H
-        # ----------------------------------------------------
+        # ====================================================
+        # ÚLTIMO ENFRENTAMIENTO
+        # ====================================================
 
         st.subheader(
-            "Último enfrentamiento en la liga"
+            "Último enfrentamiento"
         )
 
         mostrar_partido(
@@ -472,9 +493,9 @@ if st.button(
         )
 
 
-        # ----------------------------------------------------
-        # SEGUNDO H2H
-        # ----------------------------------------------------
+        # ====================================================
+        # ENFRENTAMIENTO ANTERIOR
+        # ====================================================
 
         if len(h2h) >= 2:
 
@@ -485,7 +506,6 @@ if st.button(
             mostrar_partido(
                 h2h[1]
             )
-
 
     else:
 
