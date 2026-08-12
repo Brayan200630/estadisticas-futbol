@@ -103,6 +103,15 @@ if st.button(
 
 
     # ========================================================
+    # FECHA COMO STRING
+    # ========================================================
+
+    fecha_limite = fecha_partido.strftime(
+        "%Y-%m-%d"
+    )
+
+
+    # ========================================================
     # BÚSQUEDA
     # ========================================================
 
@@ -111,11 +120,11 @@ if st.button(
     ):
 
         print(
-            "===================================="
+            "========================================"
         )
 
         print(
-            "===== INICIO DE BUSQUEDA ====="
+            "INICIO DE BÚSQUEDA"
         )
 
         print(
@@ -134,33 +143,31 @@ if st.button(
         )
 
         print(
-            "Fecha:",
-            fecha_partido
+            "Fecha límite:",
+            fecha_limite
         )
 
         print(
-            "===================================="
+            "========================================"
         )
 
 
         datos = analizar_partido(
             equipo_a.strip(),
             equipo_b.strip(),
-            fecha_partido.strftime(
-                "%Y-%m-%d"
-            ),
+            fecha_limite,
             liga.strip()
         )
 
 
     # ========================================================
-    # COMPROBAR ERROR
+    # ERROR
     # ========================================================
 
     if not datos:
 
         st.error(
-            "Sofascore no devolvió información."
+            "No se recibieron datos."
         )
 
         st.stop()
@@ -190,12 +197,6 @@ if st.button(
     )
 
 
-    liga_encontrada = datos.get(
-        "liga",
-        liga
-    )
-
-
     # ========================================================
     # INFORMACIÓN ENCONTRADA
     # ========================================================
@@ -207,12 +208,18 @@ if st.button(
 
 
     st.info(
-        f"Liga seleccionada: {liga_encontrada}"
+        f"Liga seleccionada: {liga}"
+    )
+
+
+    st.info(
+        f"Solo se mostrarán partidos anteriores al "
+        f"{fecha_partido.strftime('%d/%m/%Y')}."
     )
 
 
     # ========================================================
-    # FUNCIÓN MOSTRAR PARTIDO
+    # FUNCIÓN PARA MOSTRAR PARTIDO
     # ========================================================
 
     def mostrar_partido(evento):
@@ -239,15 +246,19 @@ if st.button(
 
             try:
 
+                fecha_evento = datetime.fromtimestamp(
+                    timestamp
+                )
+
                 fecha_formateada = (
-                    datetime.fromtimestamp(
-                        timestamp
-                    ).strftime(
+                    fecha_evento.strftime(
                         "%d/%m/%Y"
                     )
                 )
 
             except Exception:
+
+                fecha_evento = None
 
                 fecha_formateada = (
                     "Fecha no disponible"
@@ -255,26 +266,32 @@ if st.button(
 
         else:
 
+            fecha_evento = None
+
             fecha_formateada = (
                 "Fecha no disponible"
             )
 
 
         # ====================================================
-        # EQUIPOS
+        # LOCAL
         # ====================================================
 
         local = (
             evento
             .get("homeTeam", {})
-            .get("name", "Desconocido")
+            .get("name", "")
         )
 
+
+        # ====================================================
+        # VISITANTE
+        # ====================================================
 
         visitante = (
             evento
             .get("awayTeam", {})
-            .get("name", "Desconocido")
+            .get("name", "")
         )
 
 
@@ -282,32 +299,19 @@ if st.button(
         # LIGA
         # ====================================================
 
-        torneo = ""
-
-        unique_tournament = evento.get(
-            "uniqueTournament",
-            {}
+        torneo = (
+            evento
+            .get("uniqueTournament", {})
+            .get("name")
         )
-
-
-        if unique_tournament:
-
-            torneo = unique_tournament.get(
-                "name",
-                ""
-            )
 
 
         if not torneo:
 
-            tournament = evento.get(
-                "tournament",
-                {}
-            )
-
-            torneo = tournament.get(
-                "name",
-                ""
+            torneo = (
+                evento
+                .get("tournament", {})
+                .get("name")
             )
 
 
@@ -316,6 +320,25 @@ if st.button(
             st.write(
                 f"**Liga:** {torneo}"
             )
+
+
+        # ====================================================
+        # FECHA
+        # ====================================================
+
+        st.write(
+            f"**Fecha:** {fecha_formateada}"
+        )
+
+
+        # ====================================================
+        # PARTIDO
+        # ====================================================
+
+        st.write(
+            f"**Partido:** "
+            f"{local} vs {visitante}"
+        )
 
 
         # ====================================================
@@ -333,17 +356,6 @@ if st.button(
             evento
             .get("awayScore", {})
             .get("current")
-        )
-
-
-        st.write(
-            f"**Fecha:** {fecha_formateada}"
-        )
-
-
-        st.write(
-            f"**Partido:** "
-            f"{local} vs {visitante}"
         )
 
 
@@ -368,14 +380,34 @@ if st.button(
         )
 
 
-        # ====================================================
-        # POSESIÓN
-        # ====================================================
-
         posesion = estadisticas.get(
             "Posesión"
         )
 
+        corners = estadisticas.get(
+            "Córners"
+        )
+
+        faltas = estadisticas.get(
+            "Faltas"
+        )
+
+        tarjetas = estadisticas.get(
+            "Tarjetas amarillas"
+        )
+
+        tiros = estadisticas.get(
+            "Tiros a puerta"
+        )
+
+        fueras = estadisticas.get(
+            "Fueras de juego"
+        )
+
+
+        # ====================================================
+        # POSESIÓN
+        # ====================================================
 
         if posesion:
 
@@ -388,19 +420,13 @@ if st.button(
         else:
 
             st.write(
-                "**Posesión:** "
-                "Datos no disponibles"
+                "**Posesión:** Datos no disponibles"
             )
 
 
         # ====================================================
         # CÓRNERS
         # ====================================================
-
-        corners = estadisticas.get(
-            "Córners"
-        )
-
 
         if corners:
 
@@ -422,11 +448,6 @@ if st.button(
         # FALTAS
         # ====================================================
 
-        faltas = estadisticas.get(
-            "Faltas"
-        )
-
-
         if faltas:
 
             st.write(
@@ -438,19 +459,13 @@ if st.button(
         else:
 
             st.write(
-                "**Faltas:** "
-                "Datos no disponibles"
+                "**Faltas:** Datos no disponibles"
             )
 
 
         # ====================================================
         # TARJETAS
         # ====================================================
-
-        tarjetas = estadisticas.get(
-            "Tarjetas amarillas"
-        )
-
 
         if tarjetas:
 
@@ -472,11 +487,6 @@ if st.button(
         # TIROS A PUERTA
         # ====================================================
 
-        tiros = estadisticas.get(
-            "Tiros a puerta"
-        )
-
-
         if tiros:
 
             st.write(
@@ -496,11 +506,6 @@ if st.button(
         # ====================================================
         # FUERAS DE JUEGO
         # ====================================================
-
-        fueras = estadisticas.get(
-            "Fueras de juego"
-        )
-
 
         if fueras:
 
@@ -529,88 +534,182 @@ if st.button(
     )
 
 
-    h2h = datos.get(
+    h2h_original = datos.get(
         "h2h",
         []
     )
 
 
-    print(
-        "===================================="
-    )
-
-    print(
-        "H2H RECIBIDOS POR APP:",
-        len(h2h)
-    )
-
-    print(
-        "===================================="
-    )
-
-
     # ========================================================
-    # H2H ENCONTRADOS
+    # FILTRAR H2H POR FECHA
     # ========================================================
 
-    if h2h:
+    h2h = []
 
-        st.success(
-            f"Se encontraron "
-            f"{len(h2h)} enfrentamientos directos."
+
+    for evento in h2h_original:
+
+        if not evento:
+            continue
+
+
+        timestamp = evento.get(
+            "startTimestamp"
         )
 
 
-        for i, partido in enumerate(
-            h2h,
-            start=1
-        ):
+        if not timestamp:
+            continue
 
-            local_h2h = (
-                partido
-                .get("homeTeam", {})
-                .get("name", "Desconocido")
+
+        try:
+
+            fecha_evento = datetime.fromtimestamp(
+                timestamp
+            ).date()
+
+        except Exception:
+
+            continue
+
+
+        # ====================================================
+        # SOLO PARTIDOS ANTERIORES A LA FECHA DEL PARTIDO
+        # ====================================================
+
+        if fecha_evento >= fecha_partido:
+
+            print(
+                "H2H DESCARTADO POR FECHA:",
+                fecha_evento,
+                ">=",
+                fecha_partido
             )
 
-
-            visitante_h2h = (
-                partido
-                .get("awayTeam", {})
-                .get("name", "Desconocido")
-            )
+            continue
 
 
-            st.subheader(
-                f"Enfrentamiento directo #{i}"
-            )
+        # ====================================================
+        # COMPROBAR QUE REALMENTE SEAN LOS DOS EQUIPOS
+        # ====================================================
+
+        home_id = (
+            evento
+            .get("homeTeam", {})
+            .get("id")
+        )
 
 
-            st.write(
-                f"**{local_h2h} vs "
-                f"{visitante_h2h}**"
-            )
+        away_id = (
+            evento
+            .get("awayTeam", {})
+            .get("id")
+        )
 
 
-            mostrar_partido(
-                partido
-            )
+        id_a = datos.get(
+            "equipo_a_id"
+        )
 
 
-            if i < len(h2h):
+        id_b = datos.get(
+            "equipo_b_id"
+        )
 
-                st.divider()
+
+        # Si main.py entrega IDs, comprobarlos.
+        if id_a and id_b:
+
+            if {home_id, away_id} != {
+                id_a,
+                id_b
+            }:
+
+                continue
+
+
+        h2h.append(
+            evento
+        )
 
 
     # ========================================================
-    # SIN H2H
+    # ELIMINAR DUPLICADOS
     # ========================================================
 
-    else:
+    h2h_unicos = {}
+
+
+    for evento in h2h:
+
+        event_id = evento.get(
+            "id"
+        )
+
+        if event_id:
+
+            h2h_unicos[event_id] = evento
+
+
+    h2h = list(
+        h2h_unicos.values()
+    )
+
+
+    # ========================================================
+    # ORDENAR DEL MÁS RECIENTE AL MÁS ANTIGUO
+    # ========================================================
+
+    h2h.sort(
+        key=lambda evento:
+        evento.get(
+            "startTimestamp",
+            0
+        ),
+        reverse=True
+    )
+
+
+    # ========================================================
+    # SOLO LOS 2 MÁS RECIENTES
+    # ========================================================
+
+    h2h = h2h[:2]
+
+
+    # ========================================================
+    # MOSTRAR H2H
+    # ========================================================
+
+    if len(h2h) >= 1:
+
+        st.subheader(
+            "Último enfrentamiento"
+        )
+
+        mostrar_partido(
+            h2h[0]
+        )
+
+
+    if len(h2h) >= 2:
+
+        st.divider()
+
+        st.subheader(
+            "Enfrentamiento anterior"
+        )
+
+        mostrar_partido(
+            h2h[1]
+        )
+
+
+    if len(h2h) == 0:
 
         st.warning(
-            "No se encontraron enfrentamientos "
-            "directos entre estos dos equipos "
-            "en la liga seleccionada."
+            "No se encontró ningún enfrentamiento "
+            "directo anterior a la fecha seleccionada."
         )
 
 
@@ -621,16 +720,16 @@ if st.button(
     st.divider()
 
     st.header(
-        f"⚽ {nombre_a}"
+        f"🏠 {nombre_a}"
     )
 
 
     # ========================================================
-    # LOCAL EQUIPO A
+    # ÚLTIMO COMO LOCAL
     # ========================================================
 
     st.subheader(
-        "🏠 Último partido como LOCAL"
+        "Último partido como LOCAL"
     )
 
 
@@ -647,11 +746,11 @@ if st.button(
 
 
     # ========================================================
-    # VISITANTE EQUIPO A
+    # ÚLTIMO COMO VISITANTE
     # ========================================================
 
     st.subheader(
-        "✈️ Último partido como VISITANTE"
+        "Último partido como VISITANTE"
     )
 
 
@@ -674,16 +773,16 @@ if st.button(
     st.divider()
 
     st.header(
-        f"⚽ {nombre_b}"
+        f"✈️ {nombre_b}"
     )
 
 
     # ========================================================
-    # LOCAL EQUIPO B
+    # ÚLTIMO COMO LOCAL
     # ========================================================
 
     st.subheader(
-        "🏠 Último partido como LOCAL"
+        "Último partido como LOCAL"
     )
 
 
@@ -700,11 +799,11 @@ if st.button(
 
 
     # ========================================================
-    # VISITANTE EQUIPO B
+    # ÚLTIMO COMO VISITANTE
     # ========================================================
 
     st.subheader(
-        "✈️ Último partido como VISITANTE"
+        "Último partido como VISITANTE"
     )
 
 
