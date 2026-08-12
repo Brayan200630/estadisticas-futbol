@@ -527,112 +527,97 @@ def obtener_historial(team_id):
 # ============================================================
 
 def obtener_h2h(
+   def buscar_h2h_directo(
     historial,
-    equipo_local,
-    equipo_visitante,
-    fecha_limite,
-    liga
+    equipo_a_id,
+    equipo_b_id,
+    liga,
+    fecha_limite
 ):
 
     encontrados = []
 
     for evento in historial:
 
-        # ====================================================
-        # FECHA
-        # ====================================================
+        if not evento:
+            continue
 
+        # Solo partidos anteriores
         if not es_anterior_a_fecha(
             evento,
             fecha_limite
         ):
             continue
 
-        # ====================================================
-        # PARTIDO FINALIZADO
-        # ====================================================
-
+        # Solo partidos finalizados
         if not partido_valido(evento):
             continue
 
         # ====================================================
-        # FILTRO DE LIGA
+        # IDS DE LOS EQUIPOS
         # ====================================================
 
-        if not pertenece_a_liga(
-            evento,
-            liga
-        ):
+        home_id = (
+            evento
+            .get("homeTeam", {})
+            .get("id")
+        )
+
+        away_id = (
+            evento
+            .get("awayTeam", {})
+            .get("id")
+        )
+
+        # ====================================================
+        # COMPROBAR QUE SEAN LOS DOS EQUIPOS
+        # ====================================================
+
+        if {home_id, away_id} != {
+            equipo_a_id,
+            equipo_b_id
+        }:
             continue
 
         # ====================================================
-        # EQUIPOS
+        # COMPROBAR LIGA
         # ====================================================
 
-        local = (
-            evento
-            .get("homeTeam", {})
-            .get("name", "")
-            .strip()
-            .lower()
+        torneo = evento.get(
+            "uniqueTournament",
+            {}
         )
 
-        visitante = (
-            evento
-            .get("awayTeam", {})
-            .get("name", "")
-            .strip()
-            .lower()
+        nombre_liga = torneo.get(
+            "name",
+            ""
+        ).strip()
+
+        print(
+            "H2H -> LIGA:",
+            repr(nombre_liga),
+            "| BUSCADA:",
+            repr(liga)
         )
 
-        equipo_a = (
-            equipo_local
-            .strip()
-            .lower()
-        )
+        if nombre_liga.lower() != liga.strip().lower():
+            continue
 
-        equipo_b = (
-            equipo_visitante
-            .strip()
-            .lower()
-        )
+        encontrados.append(evento)
 
-        # ====================================================
-        # H2H EN CUALQUIER DIRECCIÓN
-        # ====================================================
+    # ========================================================
+    # ORDENAR DEL MÁS RECIENTE AL MÁS ANTIGUO
+    # ========================================================
 
-        es_h2h = (
-            (
-                local == equipo_a
-                and visitante == equipo_b
-            )
-            or
-            (
-                local == equipo_b
-                and visitante == equipo_a
-            )
-        )
+    encontrados.sort(
+        key=lambda x: x.get(
+            "startTimestamp",
+            0
+        ),
+        reverse=True
+    )
 
-        if es_h2h:
-
-            print(
-                "H2H ENCONTRADO:",
-                evento.get("id"),
-                "|",
-                evento
-                .get("homeTeam", {})
-                .get("name"),
-                "vs",
-                evento
-                .get("awayTeam", {})
-                .get("name"),
-                "| LIGA:",
-                obtener_nombre_liga(evento)
-            )
-
-            encontrados.append(
-                evento
-            )
+    return encontrados[:2]
 
     # ========================================================
     # ORDENAR DEL MÁS RECIENTE AL MÁS ANTIGUO
@@ -1027,12 +1012,13 @@ def obtener_estadisticas(evento):
 # ANALIZAR PARTIDO
 # ============================================================
 
-def analizar_partido(
-    nombre_equipo_a,
-    nombre_equipo_b,
-    fecha_partido,
-    liga
-):
+h2h = buscar_h2h_directo(
+    historial_a,
+    id_a,
+    id_b,
+    liga,
+    fecha_partido
+)
 
     # ========================================================
     # VALIDAR LIGA
@@ -1076,53 +1062,53 @@ def analizar_partido(
             )
         }
 
-    # ========================================================
-    # IDS Y NOMBRES
-    # ========================================================
+ # ========================================================
+# IDS
+# ========================================================
 
-    id_a = equipo_a["id"]
+id_a = equipo_a["id"]
+id_b = equipo_b["id"]
 
-    id_b = equipo_b["id"]
+nombre_a = equipo_a["name"]
+nombre_b = equipo_b["name"]
 
-    nombre_a = equipo_a["name"]
 
-    nombre_b = equipo_b["name"]
+# ========================================================
+# HISTORIALES
+# ========================================================
 
-    # ========================================================
-    # HISTORIALES
-    # ========================================================
+historial_a = obtener_historial(
+    id_a
+)
 
-    historial_a = obtener_historial(
-        id_a
-    )
+historial_b = obtener_historial(
+    id_b
+)
 
-    historial_b = obtener_historial(
-        id_b
-    )
 
-    # ========================================================
-    # H2H
-    # ========================================================
+# ========================================================
+# H2H
+# ========================================================
 
-    h2h = obtener_dos_h2h(
-        historial_a,
-        historial_b,
-        nombre_a,
-        nombre_b,
-        fecha_partido,
-        liga
-    )
+h2h = buscar_h2h_directo(
+    historial_a,
+    id_a,
+    id_b,
+    liga,
+    fecha_partido
+)
 
-    # ========================================================
-    # EQUIPO A - LOCAL
-    # ========================================================
 
-    local_a = ultimo_local(
-        historial_a,
-        nombre_a,
-        fecha_partido,
-        liga
-    )
+# ========================================================
+# EQUIPO A - LOCAL
+# ========================================================
+
+local_a = ultimo_local(
+    historial_a,
+    nombre_a,
+    fecha_partido,
+    liga
+)
 
     # ========================================================
     # EQUIPO A - VISITANTE
