@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import date, datetime
 from curl_cffi import requests
 from urllib.parse import quote
+import streamlit.components.v1 as components
 
 from main import analizar_partido, obtener_estadisticas
 
@@ -15,7 +16,6 @@ st.set_page_config(
     page_icon="⚽",
     layout="centered"
 )
-
 
 BASE_URL = "https://www.sofascore.com/api/v1"
 
@@ -176,7 +176,6 @@ def buscar_ligas_app(nombre):
             "uniqueTournament",
             "tournament"
         }:
-
             continue
 
         entidad = resultado.get(
@@ -232,10 +231,7 @@ def buscar_ligas_app(nombre):
             {}
         )
 
-        if isinstance(
-            category,
-            dict
-        ):
+        if isinstance(category, dict):
 
             pais = category.get(
                 "name",
@@ -270,9 +266,7 @@ def buscar_ligas_app(nombre):
 # TÍTULO
 # ============================================================
 
-st.title(
-    "⚽ Estadísticas de Fútbol"
-)
+st.title("⚽ Estadísticas de Fútbol")
 
 st.write(
     "Consulta estadísticas de los últimos partidos "
@@ -284,9 +278,7 @@ st.write(
 # EQUIPO A
 # ============================================================
 
-st.subheader(
-    "Equipo A"
-)
+st.subheader("Equipo A")
 
 busqueda_a = st.text_input(
     "Buscar Equipo A",
@@ -333,9 +325,7 @@ else:
 # EQUIPO B
 # ============================================================
 
-st.subheader(
-    "Equipo B"
-)
+st.subheader("Equipo B")
 
 busqueda_b = st.text_input(
     "Buscar Equipo B",
@@ -382,9 +372,7 @@ else:
 # COMPETICIÓN
 # ============================================================
 
-st.subheader(
-    "Competición"
-)
+st.subheader("Competición")
 
 modo_competicion = st.radio(
     "¿Cómo quieres buscar los partidos?",
@@ -447,15 +435,11 @@ if modo_competicion == "Competición específica":
 
 else:
 
-    # ========================================================
-    # TODAS LAS COMPETICIONES
-    #
     # IMPORTANTE:
-    # Enviamos "TODAS" al main.py.
-    # No dejamos liga vacía.
-    # ========================================================
+    # Cadena vacía = todas las competiciones
+    # según el main.py actual.
 
-    liga = "TODAS"
+    liga = ""
 
     st.info(
         "🌎 Se buscarán los últimos partidos "
@@ -526,14 +510,12 @@ def obtener_resultado(evento):
         home_score,
         dict
     ):
-
         home_score = {}
 
     if not isinstance(
         away_score,
         dict
     ):
-
         away_score = {}
 
     # ========================================================
@@ -562,10 +544,6 @@ def obtener_resultado(evento):
 
     # ========================================================
     # PARTIDO DECIDIDO POR PENALES
-    #
-    # Ejemplo:
-    #
-    # 1 (5) - 1 (4)
     # ========================================================
 
     if (
@@ -582,10 +560,6 @@ def obtener_resultado(evento):
             "normaltime"
         )
 
-        # ----------------------------------------------------
-        # Respaldo: overtime
-        # ----------------------------------------------------
-
         if (
             home_regular is None
             or
@@ -600,10 +574,6 @@ def obtener_resultado(evento):
                 "overtime"
             )
 
-        # ----------------------------------------------------
-        # Respaldo: period1
-        # ----------------------------------------------------
-
         if (
             home_regular is None
             or
@@ -617,10 +587,6 @@ def obtener_resultado(evento):
             away_regular = away_score.get(
                 "period1"
             )
-
-        # ----------------------------------------------------
-        # Último respaldo
-        # ----------------------------------------------------
 
         if (
             home_regular is None
@@ -663,22 +629,13 @@ def obtener_resultado(evento):
 
 
 # ============================================================
-# FUNCIÓN PARA MOSTRAR PARTIDO
+# FUNCIÓN PARA GENERAR TEXTO DE UN PARTIDO
 # ============================================================
 
-def mostrar_partido(evento):
+def texto_partido(evento):
 
     if not evento:
-
-        st.info(
-            "No se encontró un partido válido."
-        )
-
-        return
-
-    # ========================================================
-    # EQUIPOS
-    # ========================================================
+        return "No se encontró un partido válido."
 
     local = (
         evento
@@ -692,17 +649,9 @@ def mostrar_partido(evento):
         .get("name", "Desconocido")
     )
 
-    # ========================================================
-    # FECHA
-    # ========================================================
-
     fecha_formateada = formatear_fecha(
         evento
     )
-
-    # ========================================================
-    # TORNEO / LIGA
-    # ========================================================
 
     torneo = (
         evento
@@ -718,46 +667,9 @@ def mostrar_partido(evento):
             .get("name")
         )
 
-    if torneo:
-
-        st.write(
-            f"**Liga:** {torneo}"
-        )
-
-    # ========================================================
-    # FECHA
-    # ========================================================
-
-    st.write(
-        f"**Fecha:** {fecha_formateada}"
-    )
-
-    # ========================================================
-    # PARTIDO
-    # ========================================================
-
-    st.write(
-        f"**Partido:** "
-        f"{local} vs {visitante}"
-    )
-
-    # ========================================================
-    # RESULTADO
-    # ========================================================
-
     resultado = obtener_resultado(
         evento
     )
-
-    if resultado:
-
-        st.write(
-            f"**Resultado:** {resultado}"
-        )
-
-    # ========================================================
-    # ESTADÍSTICAS
-    # ========================================================
 
     estadisticas = obtener_estadisticas(
         evento
@@ -787,9 +699,213 @@ def mostrar_partido(evento):
         "Fueras de juego"
     )
 
-    # ========================================================
-    # POSESIÓN
-    # ========================================================
+    texto = []
+
+    if torneo:
+
+        texto.append(
+            f"Liga: {torneo}"
+        )
+
+    texto.append(
+        f"Fecha: {fecha_formateada}"
+    )
+
+    texto.append(
+        f"Partido: {local} vs {visitante}"
+    )
+
+    if resultado:
+
+        texto.append(
+            f"Resultado: {resultado}"
+        )
+
+    if posesion:
+
+        texto.append(
+            f"Posesión: "
+            f"{local} {posesion[0]} - "
+            f"{posesion[1]} {visitante}"
+        )
+
+    else:
+
+        texto.append(
+            "Posesión: Datos no disponibles"
+        )
+
+    if corners:
+
+        texto.append(
+            f"Saques de esquina: "
+            f"{local} {corners[0]} - "
+            f"{corners[1]} {visitante}"
+        )
+
+    else:
+
+        texto.append(
+            "Saques de esquina: Datos no disponibles"
+        )
+
+    if faltas:
+
+        texto.append(
+            f"Faltas: "
+            f"{local} {faltas[0]} - "
+            f"{faltas[1]} {visitante}"
+        )
+
+    else:
+
+        texto.append(
+            "Faltas: Datos no disponibles"
+        )
+
+    if tarjetas:
+
+        texto.append(
+            f"Tarjetas amarillas: "
+            f"{local} {tarjetas[0]} - "
+            f"{tarjetas[1]} {visitante}"
+        )
+
+    else:
+
+        texto.append(
+            "Tarjetas amarillas: Datos no disponibles"
+        )
+
+    if tiros:
+
+        texto.append(
+            f"Tiros a puerta: "
+            f"{local} {tiros[0]} - "
+            f"{tiros[1]} {visitante}"
+        )
+
+    else:
+
+        texto.append(
+            "Tiros a puerta: Datos no disponibles"
+        )
+
+    if fueras:
+
+        texto.append(
+            f"Fueras de juego: "
+            f"{local} {fueras[0]} - "
+            f"{fueras[1]} {visitante}"
+        )
+
+    else:
+
+        texto.append(
+            "Fueras de juego: Datos no disponibles"
+        )
+
+    return "\n".join(
+        texto
+    )
+
+
+# ============================================================
+# FUNCIÓN PARA MOSTRAR PARTIDO
+# ============================================================
+
+def mostrar_partido(evento):
+
+    if not evento:
+
+        st.info(
+            "No se encontró un partido válido."
+        )
+
+        return
+
+    local = (
+        evento
+        .get("homeTeam", {})
+        .get("name", "Desconocido")
+    )
+
+    visitante = (
+        evento
+        .get("awayTeam", {})
+        .get("name", "Desconocido")
+    )
+
+    fecha_formateada = formatear_fecha(
+        evento
+    )
+
+    torneo = (
+        evento
+        .get("uniqueTournament", {})
+        .get("name")
+    )
+
+    if not torneo:
+
+        torneo = (
+            evento
+            .get("tournament", {})
+            .get("name")
+        )
+
+    if torneo:
+
+        st.write(
+            f"**Liga:** {torneo}"
+        )
+
+    st.write(
+        f"**Fecha:** {fecha_formateada}"
+    )
+
+    st.write(
+        f"**Partido:** "
+        f"{local} vs {visitante}"
+    )
+
+    resultado = obtener_resultado(
+        evento
+    )
+
+    if resultado:
+
+        st.write(
+            f"**Resultado:** {resultado}"
+        )
+
+    estadisticas = obtener_estadisticas(
+        evento
+    )
+
+    posesion = estadisticas.get(
+        "Posesión"
+    )
+
+    corners = estadisticas.get(
+        "Córners"
+    )
+
+    faltas = estadisticas.get(
+        "Faltas"
+    )
+
+    tarjetas = estadisticas.get(
+        "Tarjetas amarillas"
+    )
+
+    tiros = estadisticas.get(
+        "Tiros a puerta"
+    )
+
+    fueras = estadisticas.get(
+        "Fueras de juego"
+    )
 
     if posesion:
 
@@ -806,10 +922,6 @@ def mostrar_partido(evento):
             "Datos no disponibles"
         )
 
-    # ========================================================
-    # CÓRNERS
-    # ========================================================
-
     if corners:
 
         st.write(
@@ -824,10 +936,6 @@ def mostrar_partido(evento):
             "**Saques de esquina:** "
             "Datos no disponibles"
         )
-
-    # ========================================================
-    # FALTAS
-    # ========================================================
 
     if faltas:
 
@@ -844,10 +952,6 @@ def mostrar_partido(evento):
             "Datos no disponibles"
         )
 
-    # ========================================================
-    # TARJETAS
-    # ========================================================
-
     if tarjetas:
 
         st.write(
@@ -863,10 +967,6 @@ def mostrar_partido(evento):
             "Datos no disponibles"
         )
 
-    # ========================================================
-    # TIROS A PUERTA
-    # ========================================================
-
     if tiros:
 
         st.write(
@@ -881,10 +981,6 @@ def mostrar_partido(evento):
             "**Tiros a puerta:** "
             "Datos no disponibles"
         )
-
-    # ========================================================
-    # FUERAS DE JUEGO
-    # ========================================================
 
     if fueras:
 
@@ -931,19 +1027,10 @@ if st.button(
 
         st.stop()
 
-    # ========================================================
-    # IMPORTANTE:
-    #
-    # SOLAMENTE se exige liga cuando se selecciona
-    # "Competición específica".
-    #
-    # Si es "Todas las competiciones", liga = "TODAS"
-    # y no se ejecuta esta validación.
-    # ========================================================
-
     if (
         modo_competicion
-        == "Competición específica"
+        ==
+        "Competición específica"
         and
         not liga.strip()
     ):
@@ -974,10 +1061,6 @@ if st.button(
         )
 
         st.stop()
-
-    # ========================================================
-    # INFORMACIÓN DEL RANGO
-    # ========================================================
 
     st.info(
         f"📅 Buscando partidos desde "
@@ -1011,42 +1094,6 @@ if st.button(
     with st.spinner(
         "Buscando información en Sofascore..."
     ):
-
-        print(
-            "===== INICIO DE BUSQUEDA ====="
-        )
-
-        print(
-            "Equipo A:",
-            equipo_a.strip()
-        )
-
-        print(
-            "Equipo B:",
-            equipo_b.strip()
-        )
-
-        print(
-            "Liga:",
-            liga.strip()
-        )
-
-        print(
-            "Fecha:",
-            fecha_partido
-        )
-
-        print(
-            "Modo:",
-            modo_competicion
-        )
-
-        print(
-            "RANGO:",
-            fecha_inicio,
-            "->",
-            fecha_fin
-        )
 
         datos = analizar_partido(
             equipo_a.strip(),
@@ -1091,10 +1138,6 @@ if st.button(
         equipo_b
     )
 
-    # ========================================================
-    # INFORMACIÓN ENCONTRADA
-    # ========================================================
-
     st.success(
         f"Equipos encontrados: "
         f"{nombre_a} vs {nombre_b}"
@@ -1102,7 +1145,8 @@ if st.button(
 
     if (
         modo_competicion
-        == "Todas las competiciones"
+        ==
+        "Todas las competiciones"
     ):
 
         st.info(
@@ -1189,10 +1233,6 @@ if st.button(
         f"⚽ {nombre_a}"
     )
 
-    # ========================================================
-    # EQUIPO A LOCAL
-    # ========================================================
-
     st.subheader(
         "🏠 Último partido como LOCAL"
     )
@@ -1218,10 +1258,6 @@ if st.button(
             "desde el 01/01/2020 hasta la fecha "
             "seleccionada."
         )
-
-    # ========================================================
-    # EQUIPO A VISITANTE
-    # ========================================================
 
     st.subheader(
         "✈️ Último partido como VISITANTE"
@@ -1259,10 +1295,6 @@ if st.button(
         f"⚽ {nombre_b}"
     )
 
-    # ========================================================
-    # EQUIPO B LOCAL
-    # ========================================================
-
     st.subheader(
         "🏠 Último partido como LOCAL"
     )
@@ -1289,10 +1321,6 @@ if st.button(
             "seleccionada."
         )
 
-    # ========================================================
-    # EQUIPO B VISITANTE
-    # ========================================================
-
     st.subheader(
         "✈️ Último partido como VISITANTE"
     )
@@ -1317,4 +1345,319 @@ if st.button(
             "No se encontró un partido válido "
             "desde el 01/01/2020 hasta la fecha "
             "seleccionada."
+        )
+
+    # ========================================================
+    # TEXTO COMPLETO PARA COPIAR
+    # ========================================================
+
+    texto_completo = []
+
+    texto_completo.append(
+        f"⚽ {nombre_a} vs {nombre_b}"
+    )
+
+    texto_completo.append("")
+
+    if modo_competicion == "Todas las competiciones":
+
+        texto_completo.append(
+            "Competición: Todas las competiciones"
+        )
+
+    else:
+
+        texto_completo.append(
+            f"Competición: {liga}"
+        )
+
+    texto_completo.append(
+        f"Fecha de referencia: "
+        f"{fecha_partido.strftime('%d/%m/%Y')}"
+    )
+
+    texto_completo.append("")
+
+    # ========================================================
+    # H2H
+    # ========================================================
+
+    texto_completo.append(
+        "🔁 ENFRENTAMIENTOS DIRECTOS"
+    )
+
+    texto_completo.append("")
+
+    texto_completo.append(
+        f"🏠 Último enfrentamiento con "
+        f"{nombre_a} como LOCAL"
+    )
+
+    texto_completo.append("")
+
+    if h2h_a_local:
+
+        texto_completo.append(
+            texto_partido(
+                h2h_a_local
+            )
+        )
+
+    else:
+
+        texto_completo.append(
+            "No se encontró un enfrentamiento."
+        )
+
+    texto_completo.append("")
+
+    texto_completo.append(
+        f"✈️ Último enfrentamiento con "
+        f"{nombre_a} como VISITANTE"
+    )
+
+    texto_completo.append("")
+
+    if h2h_a_visitante:
+
+        texto_completo.append(
+            texto_partido(
+                h2h_a_visitante
+            )
+        )
+
+    else:
+
+        texto_completo.append(
+            "No se encontró un enfrentamiento."
+        )
+
+    texto_completo.append("")
+
+    # ========================================================
+    # EQUIPO A
+    # ========================================================
+
+    texto_completo.append(
+        f"⚽ {nombre_a}"
+    )
+
+    texto_completo.append("")
+
+    texto_completo.append(
+        "🏠 Último partido como LOCAL"
+    )
+
+    texto_completo.append("")
+
+    if local_a:
+
+        texto_completo.append(
+            texto_partido(
+                local_a
+            )
+        )
+
+    else:
+
+        texto_completo.append(
+            "No se encontró un partido válido."
+        )
+
+    texto_completo.append("")
+
+    texto_completo.append(
+        "✈️ Último partido como VISITANTE"
+    )
+
+    texto_completo.append("")
+
+    if visitante_a:
+
+        texto_completo.append(
+            texto_partido(
+                visitante_a
+            )
+        )
+
+    else:
+
+        texto_completo.append(
+            "No se encontró un partido válido."
+        )
+
+    texto_completo.append("")
+
+    # ========================================================
+    # EQUIPO B
+    # ========================================================
+
+    texto_completo.append(
+        f"⚽ {nombre_b}"
+    )
+
+    texto_completo.append("")
+
+    texto_completo.append(
+        "🏠 Último partido como LOCAL"
+    )
+
+    texto_completo.append("")
+
+    if local_b:
+
+        texto_completo.append(
+            texto_partido(
+                local_b
+            )
+        )
+
+    else:
+
+        texto_completo.append(
+            "No se encontró un partido válido."
+        )
+
+    texto_completo.append("")
+
+    texto_completo.append(
+        "✈️ Último partido como VISITANTE"
+    )
+
+    texto_completo.append("")
+
+    if visitante_b:
+
+        texto_completo.append(
+            texto_partido(
+                visitante_b
+            )
+        )
+
+    else:
+
+        texto_completo.append(
+            "No se encontró un partido válido."
+        )
+
+    texto_final = "\n".join(
+        texto_completo
+    )
+
+    # ========================================================
+    # COPIAR RESULTADOS
+    # ========================================================
+
+    st.divider()
+
+    st.header(
+        "📋 Texto para copiar"
+    )
+
+    st.write(
+        "Puedes copiar todo el análisis con el botón de abajo."
+    )
+
+    texto_html = (
+        texto_final
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+    components.html(
+        f"""
+        <div style="
+            width: 100%;
+            font-family: Arial, sans-serif;
+        ">
+
+            <button
+                onclick="copiarTexto()"
+                style="
+                    width: 100%;
+                    padding: 12px;
+                    background-color: #ff4b4b;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                "
+            >
+                📋 Copiar resultados
+            </button>
+
+            <div
+                id="mensaje"
+                style="
+                    text-align: center;
+                    margin-top: 8px;
+                    font-size: 14px;
+                    color: #16a34a;
+                    font-weight: bold;
+                "
+            ></div>
+
+        </div>
+
+        <script>
+
+        const texto = `{texto_html}`;
+
+        function copiarTexto() {{
+
+            navigator.clipboard.writeText(texto)
+            .then(function() {{
+
+                document.getElementById(
+                    "mensaje"
+                ).innerText =
+                    "✅ Resultados copiados";
+
+            }})
+            .catch(function() {{
+
+                const area =
+                    document.createElement("textarea");
+
+                area.value = texto;
+
+                document.body.appendChild(area);
+
+                area.select();
+
+                document.execCommand(
+                    "copy"
+                );
+
+                document.body.removeChild(area);
+
+                document.getElementById(
+                    "mensaje"
+                ).innerText =
+                    "✅ Resultados copiados";
+
+            }});
+
+        }}
+
+        </script>
+        """,
+        height=75
+    )
+
+    # ========================================================
+    # VISTA DEL TEXTO
+    # ========================================================
+
+    with st.expander(
+        "👁️ Ver texto completo"
+    ):
+
+        st.code(
+            texto_final,
+            language=None
         )
