@@ -109,7 +109,6 @@ def buscar_equipo(nombre):
             nombre_encontrado
         )
 
-        # Solo nos interesan equipos
         if tipo == "team":
 
             candidatos.append(
@@ -376,10 +375,13 @@ def pertenece_a_liga(
 
 
 # ============================================================
-# MOSTRAR LIGA DEL PARTIDO
+# OBTENER NOMBRE DE LIGA
 # ============================================================
 
 def obtener_nombre_liga(evento):
+
+    if not evento:
+        return "Liga desconocida"
 
     torneo = evento.get(
         "uniqueTournament",
@@ -437,6 +439,7 @@ def obtener_historial(team_id):
 
         pagina += 1
 
+        # Evitar descargar demasiadas páginas
         if pagina >= 10:
             break
 
@@ -459,19 +462,29 @@ def obtener_h2h(
 
     for evento in historial:
 
-        # Fecha anterior al partido que estamos analizando
+        # ----------------------------------------------------
+        # FECHA
+        # ----------------------------------------------------
+
         if not es_anterior_a_fecha(
             evento,
             fecha_limite
         ):
             continue
 
-        # SOLO LA LIGA SELECCIONADA
+        # ----------------------------------------------------
+        # LIGA
+        # ----------------------------------------------------
+
         if not pertenece_a_liga(
             evento,
             liga
         ):
             continue
+
+        # ----------------------------------------------------
+        # EQUIPOS
+        # ----------------------------------------------------
 
         local = (
             evento
@@ -484,6 +497,10 @@ def obtener_h2h(
             .get("awayTeam", {})
             .get("name", "")
         )
+
+        # ----------------------------------------------------
+        # H2H
+        # ----------------------------------------------------
 
         if (
             local.lower()
@@ -591,7 +608,10 @@ def ultimo_local(
         ):
             continue
 
-        # SOLO LA LIGA SELECCIONADA
+        # ----------------------------------------------------
+        # SOLO LIGA SELECCIONADA
+        # ----------------------------------------------------
+
         if not pertenece_a_liga(
             evento,
             liga
@@ -652,7 +672,10 @@ def ultimo_visitante(
         ):
             continue
 
-        # SOLO LA LIGA SELECCIONADA
+        # ----------------------------------------------------
+        # SOLO LIGA SELECCIONADA
+        # ----------------------------------------------------
+
         if not pertenece_a_liga(
             evento,
             liga
@@ -722,6 +745,9 @@ def obtener_estadisticas(evento):
     event_id = evento.get(
         "id"
     )
+
+    if not event_id:
+        return resultado
 
     url = (
         f"{BASE_URL}/event/"
@@ -850,6 +876,18 @@ def analizar_partido(
 ):
 
     # ========================================================
+    # VALIDAR LIGA
+    # ========================================================
+
+    if not liga or not liga.strip():
+
+        return {
+            "error": "Debes indicar una liga."
+        }
+
+    liga = liga.strip()
+
+    # ========================================================
     # BUSCAR EQUIPOS
     # ========================================================
 
@@ -880,7 +918,7 @@ def analizar_partido(
         }
 
     # ========================================================
-    # IDS
+    # IDS Y NOMBRES
     # ========================================================
 
     id_a = equipo_a["id"]
