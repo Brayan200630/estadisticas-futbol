@@ -4,7 +4,11 @@ from curl_cffi import requests
 from urllib.parse import quote
 import streamlit.components.v1 as components
 
-from main import analizar_partido, obtener_estadisticas
+from main import (
+    analizar_partido,
+    obtener_estadisticas,
+    buscar_equipo
+)
 
 # ============================================================
 # CONFIGURACIÓN
@@ -191,11 +195,6 @@ def buscar_ligas_app(nombre):
         nombre_liga = entidad.get(
             "name"
         )
-
-        # ----------------------------------------------------
-        # Algunos resultados pueden tener uniqueTournament
-        # dentro de entity.
-        # ----------------------------------------------------
 
         if not tournament_id:
 
@@ -444,14 +443,6 @@ if modo_competicion == "Competición específica":
 
 else:
 
-    # ========================================================
-    # TODAS LAS COMPETICIONES
-    #
-    # IMPORTANTE:
-    # Enviamos "TODAS" al main.py.
-    # No dejamos liga vacía.
-    # ========================================================
-
     liga = "TODAS"
 
     st.info(
@@ -466,7 +457,7 @@ else:
 # ============================================================
 
 fecha_partido = st.date_input(
-    "Fecha del partido",
+    "Fecha límite del partido",
     value=date.today()
 )
 
@@ -493,6 +484,35 @@ def formatear_fecha(evento):
             int(timestamp)
         ).strftime(
             "%d/%m/%Y"
+        )
+
+    except Exception:
+
+        return "Fecha no disponible"
+
+
+# ============================================================
+# FUNCIÓN PARA FORMATEAR FECHA Y HORA
+# ============================================================
+
+def formatear_fecha_hora(evento):
+
+    if not evento:
+        return "Fecha no disponible"
+
+    timestamp = evento.get(
+        "startTimestamp"
+    )
+
+    if timestamp is None:
+        return "Fecha no disponible"
+
+    try:
+
+        return datetime.fromtimestamp(
+            int(timestamp)
+        ).strftime(
+            "%d/%m/%Y %H:%M"
         )
 
     except Exception:
@@ -557,14 +577,6 @@ def obtener_resultado(evento):
         "penalties"
     )
 
-    # ========================================================
-    # PARTIDO DECIDIDO POR PENALES
-    #
-    # Ejemplo:
-    #
-    # 1 (5) - 1 (4)
-    # ========================================================
-
     if (
         home_penalty is not None
         and
@@ -578,10 +590,6 @@ def obtener_resultado(evento):
         away_regular = away_score.get(
             "normaltime"
         )
-
-        # ----------------------------------------------------
-        # Respaldo: overtime
-        # ----------------------------------------------------
 
         if (
             home_regular is None
@@ -597,10 +605,6 @@ def obtener_resultado(evento):
                 "overtime"
             )
 
-        # ----------------------------------------------------
-        # Respaldo: period1
-        # ----------------------------------------------------
-
         if (
             home_regular is None
             or
@@ -611,13 +615,9 @@ def obtener_resultado(evento):
                 "period1"
             )
 
-            away_regular = home_score.get(
+            away_regular = away_score.get(
                 "period1"
             )
-
-        # ----------------------------------------------------
-        # Último respaldo
-        # ----------------------------------------------------
 
         if (
             home_regular is None
@@ -660,7 +660,1054 @@ def obtener_resultado(evento):
 
 
 # ============================================================
-# FUNCIÓN PARA MOSTRAR PARTIDO
+# OBTENER NOMBRE DEL ENTRENADOR
+# ============================================================
+
+@st.cache_data(ttl=3600)
+def obtener_entrenador_equipo(team_id):
+
+    if not team_id:
+        return None
+
+    endpoints = [
+
+        f"{BASE_URL}/team/{team_id}/manager",
+
+        f"{BASE_URL}/team/{team_id}/managers"
+
+    ]
+
+    for url in endpoints:
+
+        datos = obtener_json_app(
+            url
+        )
+
+        if not datos:
+            continue
+
+        manager = datos.get(
+            "manager"
+        )
+
+        if isinstance(
+            manager,
+            dict
+        ):
+
+            nombre = manager.get(
+                "name"
+            )
+
+            if nombre:
+                return nombre
+
+        managers = datos.get(
+            "managers"
+        )
+
+        if isinstance(
+            managers,
+            list
+        ) and managers:
+
+            ultimo = managers[-1]
+
+            if isinstance(
+                ultimo,
+                dict
+            ):
+
+                nombre = ultimo.get(
+                    "name"
+                )
+
+                if nombre:
+                    return nombre
+
+    return None
+
+
+# ============================================================
+# OBTENER PRÓXIMOS PARTIDOS DEL EQUIPO
+# ============================================================
+
+@st.cache_data(ttl=900)
+def obtener_proximos_partidos(team_id):
+
+    if not team_id:
+        return []
+
+    partidos = []
+
+    for pagina in range(5):
+
+        url = (
+            f"{BASE_URL}/team/"
+            f"{team_id}/events/next/"
+            f"{pagina}"
+        )
+
+        datos = obtener_json_app(
+            url
+        )
+
+        if not datos:
+            break
+
+        eventos = datos.get(
+            "events",
+            []
+        )
+
+        if not eventos:
+            break
+
+        partidos.extend(
+            eventos
+        )
+
+        if not datos.get(
+            "hasNextPage",
+            False
+        ):
+
+            break
+
+    # ========================================================
+    # ELIMINAR DUPLICADOS
+    # ========================================================
+
+    unicos = {}
+
+    for evento in partidos:
+
+        event_id = evento.get(
+            "id"
+        )
+
+        if event_id:
+
+            unicos[
+                event_id
+            ] = evento
+
+    partidos = list(
+        unicos.values()
+    )
+
+    # ========================================================
+    # ORDENAR
+    # ========================================================
+
+    partidos.sort(
+        key=lambda evento:
+        evento.get(
+            "startTimestamp",
+            0
+        )
+    )
+
+    return partidos
+
+
+# ============================================================
+# OBTENER PRÓXIMO PARTIDO ENTRE DOS EQUIPOS
+# ============================================================
+
+def obtener_proximo_h2h(
+    equipo_a_id,
+    equipo_b_id
+):
+
+    proximos_a = obtener_proximos_partidos(
+        equipo_a_id
+    )
+
+    proximos_b = obtener_proximos_partidos(
+        equipo_b_id
+    )
+
+    todos = []
+
+    todos.extend(
+        proximos_a
+    )
+
+    todos.extend(
+        proximos_b
+    )
+
+    unicos = {}
+
+    for evento in todos:
+
+        if not evento:
+            continue
+
+        home_id = (
+            evento
+            .get("homeTeam", {})
+            .get("id")
+        )
+
+        away_id = (
+            evento
+            .get("awayTeam", {})
+            .get("id")
+        )
+
+        if not home_id or not away_id:
+            continue
+
+        if {
+            home_id,
+            away_id
+        } != {
+            equipo_a_id,
+            equipo_b_id
+        }:
+
+            continue
+
+        event_id = evento.get(
+            "id"
+        )
+
+        if event_id:
+
+            unicos[
+                event_id
+            ] = evento
+
+    partidos = list(
+        unicos.values()
+    )
+
+    partidos.sort(
+        key=lambda evento:
+        evento.get(
+            "startTimestamp",
+            0
+        )
+    )
+
+    if partidos:
+        return partidos[0]
+
+    return None
+
+
+# ============================================================
+# OBTENER ALINEACIONES
+# ============================================================
+
+@st.cache_data(ttl=900)
+def obtener_alineaciones(evento):
+
+    if not evento:
+        return None
+
+    event_id = evento.get(
+        "id"
+    )
+
+    if not event_id:
+        return None
+
+    url = (
+        f"{BASE_URL}/event/"
+        f"{event_id}/lineups"
+    )
+
+    datos = obtener_json_app(
+        url
+    )
+
+    if not datos:
+        return None
+
+    return datos
+
+
+# ============================================================
+# OBTENER INCIDENTES
+# ============================================================
+
+@st.cache_data(ttl=900)
+def obtener_incidentes(evento):
+
+    if not evento:
+        return []
+
+    event_id = evento.get(
+        "id"
+    )
+
+    if not event_id:
+        return []
+
+    url = (
+        f"{BASE_URL}/event/"
+        f"{event_id}/incidents"
+    )
+
+    datos = obtener_json_app(
+        url
+    )
+
+    if not datos:
+        return []
+
+    return datos.get(
+        "incidents",
+        []
+    )
+
+
+# ============================================================
+# OBTENER NOMBRE DE JUGADOR
+# ============================================================
+
+def obtener_nombre_jugador(player):
+
+    if not isinstance(
+        player,
+        dict
+    ):
+
+        return "Jugador desconocido"
+
+    return (
+        player.get("name")
+        or
+        player.get("shortName")
+        or
+        "Jugador desconocido"
+    )
+
+
+# ============================================================
+# OBTENER ALINEACIÓN DE UN EQUIPO
+# ============================================================
+
+def extraer_alineacion_equipo(
+    alineaciones,
+    side
+):
+
+    if not alineaciones:
+        return None
+
+    bloque = alineaciones.get(
+        side
+    )
+
+    if not isinstance(
+        bloque,
+        dict
+    ):
+
+        return None
+
+    titulares = []
+    suplentes = []
+
+    jugadores = bloque.get(
+        "players",
+        []
+    )
+
+    if not isinstance(
+        jugadores,
+        list
+    ):
+
+        jugadores = []
+
+    for item in jugadores:
+
+        if not isinstance(
+            item,
+            dict
+        ):
+
+            continue
+
+        player = item.get(
+            "player",
+            {}
+        )
+
+        if not isinstance(
+            player,
+            dict
+        ):
+
+            player = {}
+
+        nombre = obtener_nombre_jugador(
+            player
+        )
+
+        posicion = (
+            item.get(
+                "position"
+            )
+            or
+            ""
+        )
+
+        titular = item.get(
+            "substitute"
+        )
+
+        numero = (
+            player.get(
+                "jerseyNumber"
+            )
+            or
+            item.get(
+                "jerseyNumber"
+            )
+        )
+
+        texto = nombre
+
+        if numero is not None:
+
+            texto = (
+                f"#{numero} "
+                f"{texto}"
+            )
+
+        if posicion:
+
+            texto += (
+                f" ({posicion})"
+            )
+
+        if titular is True:
+
+            suplentes.append(
+                texto
+            )
+
+        else:
+
+            titulares.append(
+                texto
+            )
+
+    formacion = (
+        bloque.get(
+            "formation"
+        )
+    )
+
+    return {
+
+        "titulares":
+            titulares,
+
+        "suplentes":
+            suplentes,
+
+        "formacion":
+            formacion
+
+    }
+
+
+# ============================================================
+# OBTENER CAMBIOS
+# ============================================================
+
+def obtener_cambios(
+    evento,
+    equipo_id
+):
+
+    incidentes = obtener_incidentes(
+        evento
+    )
+
+    cambios = []
+
+    for incidente in incidentes:
+
+        if not isinstance(
+            incidente,
+            dict
+        ):
+
+            continue
+
+        if incidente.get(
+            "incidentType"
+        ) != "substitution":
+
+            continue
+
+        if incidente.get(
+            "isHome"
+        ) is True:
+
+            lado = "home"
+
+        else:
+
+            lado = "away"
+
+        home_id = (
+            evento
+            .get("homeTeam", {})
+            .get("id")
+        )
+
+        if (
+            lado == "home"
+            and
+            home_id != equipo_id
+        ):
+
+            continue
+
+        if (
+            lado == "away"
+            and
+            home_id == equipo_id
+        ):
+
+            continue
+
+        jugador_entro = (
+            incidente
+            .get("playerIn", {})
+        )
+
+        jugador_salio = (
+            incidente
+            .get("playerOut", {})
+        )
+
+        if not isinstance(
+            jugador_entro,
+            dict
+        ):
+
+            jugador_entro = {}
+
+        if not isinstance(
+            jugador_salio,
+            dict
+        ):
+
+            jugador_salio = {}
+
+        minuto = (
+            incidente.get(
+                "time"
+            )
+            or
+            incidente.get(
+                "incidentTime"
+            )
+            or
+            "?"
+        )
+
+        cambios.append(
+            {
+                "minuto":
+                    minuto,
+
+                "entro":
+                    obtener_nombre_jugador(
+                        jugador_entro
+                    ),
+
+                "salio":
+                    obtener_nombre_jugador(
+                        jugador_salio
+                    )
+            }
+        )
+
+    return cambios
+
+
+# ============================================================
+# OBTENER GOLES
+# ============================================================
+
+def obtener_goles(evento):
+
+    incidentes = obtener_incidentes(
+        evento
+    )
+
+    goles = []
+
+    for incidente in incidentes:
+
+        if not isinstance(
+            incidente,
+            dict
+        ):
+
+            continue
+
+        tipo = incidente.get(
+            "incidentType"
+        )
+
+        if tipo != "goal":
+            continue
+
+        jugador = incidente.get(
+            "player",
+            {}
+        )
+
+        if not isinstance(
+            jugador,
+            dict
+        ):
+
+            jugador = {}
+
+        nombre = obtener_nombre_jugador(
+            jugador
+        )
+
+        minuto = (
+            incidente.get(
+                "time"
+            )
+            or
+            incidente.get(
+                "incidentTime"
+            )
+            or
+            "?"
+        )
+
+        is_home = incidente.get(
+            "isHome"
+        )
+
+        if is_home is True:
+
+            equipo = (
+                evento
+                .get("homeTeam", {})
+                .get("name", "")
+            )
+
+        else:
+
+            equipo = (
+                evento
+                .get("awayTeam", {})
+                .get("name", "")
+            )
+
+        tipo_gol = (
+            incidente.get(
+                "incidentClass"
+            )
+            or
+            ""
+        )
+
+        goles.append(
+            {
+                "minuto":
+                    minuto,
+
+                "jugador":
+                    nombre,
+
+                "equipo":
+                    equipo,
+
+                "tipo":
+                    tipo_gol
+            }
+        )
+
+    goles.sort(
+        key=lambda x:
+        str(x["minuto"])
+    )
+
+    return goles
+
+
+# ============================================================
+# MOSTRAR ALINEACIÓN
+# ============================================================
+
+def mostrar_alineacion(
+    evento
+):
+
+    alineaciones = obtener_alineaciones(
+        evento
+    )
+
+    if not alineaciones:
+        return
+
+    home = (
+        evento
+        .get("homeTeam", {})
+    )
+
+    away = (
+        evento
+        .get("awayTeam", {})
+    )
+
+    nombre_home = home.get(
+        "name",
+        "Local"
+    )
+
+    nombre_away = away.get(
+        "name",
+        "Visitante"
+    )
+
+    alineacion_home = (
+        extraer_alineacion_equipo(
+            alineaciones,
+            "home"
+        )
+    )
+
+    alineacion_away = (
+        extraer_alineacion_equipo(
+            alineaciones,
+            "away"
+        )
+    )
+
+    if not alineacion_home and not alineacion_away:
+        return
+
+    st.write(
+        "### 👥 Alineaciones"
+    )
+
+    if alineacion_home:
+
+        st.write(
+            f"**{nombre_home}**"
+        )
+
+        if alineacion_home.get(
+            "formacion"
+        ):
+
+            st.write(
+                f"Formación: "
+                f"{alineacion_home['formacion']}"
+            )
+
+        if alineacion_home.get(
+            "titulares"
+        ):
+
+            st.write(
+                "**Titulares:** "
+                +
+                ", ".join(
+                    alineacion_home[
+                        "titulares"
+                    ]
+                )
+            )
+
+        if alineacion_home.get(
+            "suplentes"
+        ):
+
+            st.write(
+                "**Suplentes:** "
+                +
+                ", ".join(
+                    alineacion_home[
+                        "suplentes"
+                    ]
+                )
+            )
+
+    if alineacion_away:
+
+        st.write(
+            f"**{nombre_away}**"
+        )
+
+        if alineacion_away.get(
+            "formacion"
+        ):
+
+            st.write(
+                f"Formación: "
+                f"{alineacion_away['formacion']}"
+            )
+
+        if alineacion_away.get(
+            "titulares"
+        ):
+
+            st.write(
+                "**Titulares:** "
+                +
+                ", ".join(
+                    alineacion_away[
+                        "titulares"
+                    ]
+                )
+            )
+
+        if alineacion_away.get(
+            "suplentes"
+        ):
+
+            st.write(
+                "**Suplentes:** "
+                +
+                ", ".join(
+                    alineacion_away[
+                        "suplentes"
+                    ]
+                )
+            )
+
+
+# ============================================================
+# MOSTRAR GOLES
+# ============================================================
+
+def mostrar_goles(
+    evento
+):
+
+    goles = obtener_goles(
+        evento
+    )
+
+    if not goles:
+        return
+
+    st.write(
+        "### ⚽ Goles"
+    )
+
+    for gol in goles:
+
+        texto = (
+            f"**{gol['minuto']}'** — "
+            f"{gol['jugador']} "
+            f"({gol['equipo']})"
+        )
+
+        if gol.get(
+            "tipo"
+        ):
+
+            texto += (
+                f" — {gol['tipo']}"
+            )
+
+        st.write(
+            texto
+        )
+
+
+# ============================================================
+# MOSTRAR CAMBIOS
+# ============================================================
+
+def mostrar_cambios(
+    evento
+):
+
+    home_id = (
+        evento
+        .get("homeTeam", {})
+        .get("id")
+    )
+
+    away_id = (
+        evento
+        .get("awayTeam", {})
+        .get("id")
+    )
+
+    cambios_home = obtener_cambios(
+        evento,
+        home_id
+    )
+
+    cambios_away = obtener_cambios(
+        evento,
+        away_id
+    )
+
+    if not cambios_home and not cambios_away:
+        return
+
+    st.write(
+        "### 🔄 Cambios"
+    )
+
+    nombre_home = (
+        evento
+        .get("homeTeam", {})
+        .get("name")
+    )
+
+    nombre_away = (
+        evento
+        .get("awayTeam", {})
+        .get("name")
+    )
+
+    for cambio in cambios_home:
+
+        st.write(
+            f"**{nombre_home}** — "
+            f"{cambio['minuto']}' "
+            f"entró {cambio['entro']} "
+            f"por {cambio['salio']}"
+        )
+
+    for cambio in cambios_away:
+
+        st.write(
+            f"**{nombre_away}** — "
+            f"{cambio['minuto']}' "
+            f"entró {cambio['entro']} "
+            f"por {cambio['salio']}"
+        )
+
+
+# ============================================================
+# MOSTRAR PRÓXIMO PARTIDO
+# ============================================================
+
+def mostrar_proximo_partido(
+    evento,
+    titulo
+):
+
+    if not evento:
+        return
+
+    st.subheader(
+        titulo
+    )
+
+    local = (
+        evento
+        .get("homeTeam", {})
+        .get("name", "Desconocido")
+    )
+
+    visitante = (
+        evento
+        .get("awayTeam", {})
+        .get("name", "Desconocido")
+    )
+
+    torneo = (
+        evento
+        .get("uniqueTournament", {})
+        .get("name")
+    )
+
+    if not torneo:
+
+        torneo = (
+            evento
+            .get("tournament", {})
+            .get("name")
+        )
+
+    st.write(
+        f"**📅 Fecha y hora:** "
+        f"{formatear_fecha_hora(evento)}"
+    )
+
+    st.write(
+        f"**⚽ Partido:** "
+        f"{local} vs {visitante}"
+    )
+
+    if torneo:
+
+        st.write(
+            f"**🏆 Competición:** "
+            f"{torneo}"
+        )
+
+    # ========================================================
+    # ENTRENADORES
+    # ========================================================
+
+    home_id = (
+        evento
+        .get("homeTeam", {})
+        .get("id")
+    )
+
+    away_id = (
+        evento
+        .get("awayTeam", {})
+        .get("id")
+    )
+
+    entrenador_home = (
+        obtener_entrenador_equipo(
+            home_id
+        )
+    )
+
+    entrenador_away = (
+        obtener_entrenador_equipo(
+            away_id
+        )
+    )
+
+    if entrenador_home:
+
+        st.write(
+            f"**👔 Entrenador {local}:** "
+            f"{entrenador_home}"
+        )
+
+    if entrenador_away:
+
+        st.write(
+            f"**👔 Entrenador {visitante}:** "
+            f"{entrenador_away}"
+        )
+
+    # ========================================================
+    # ALINEACIONES
+    # ========================================================
+
+    mostrar_alineacion(
+        evento
+    )
+
+
+# ============================================================
+# FUNCIÓN PARA MOSTRAR PARTIDO TERMINADO
 # ============================================================
 
 def mostrar_partido(evento):
@@ -721,17 +1768,9 @@ def mostrar_partido(evento):
             f"**Liga:** {torneo}"
         )
 
-    # ========================================================
-    # FECHA
-    # ========================================================
-
     st.write(
         f"**Fecha:** {fecha_formateada}"
     )
-
-    # ========================================================
-    # PARTIDO
-    # ========================================================
 
     st.write(
         f"**Partido:** "
@@ -751,6 +1790,30 @@ def mostrar_partido(evento):
         st.write(
             f"**Resultado:** {resultado}"
         )
+
+    # ========================================================
+    # GOLES
+    # ========================================================
+
+    mostrar_goles(
+        evento
+    )
+
+    # ========================================================
+    # ALINEACIONES
+    # ========================================================
+
+    mostrar_alineacion(
+        evento
+    )
+
+    # ========================================================
+    # CAMBIOS
+    # ========================================================
+
+    mostrar_cambios(
+        evento
+    )
 
     # ========================================================
     # ESTADÍSTICAS
@@ -900,7 +1963,7 @@ def mostrar_partido(evento):
 
 
 # ============================================================
-# GENERAR TEXTO COMPLETO PARA COPIAR
+# TEXTO COPIABLE
 # ============================================================
 
 def generar_texto_copiable(
@@ -911,10 +1974,6 @@ def generar_texto_copiable(
 ):
 
     lineas = []
-
-    # ========================================================
-    # INFORMACIÓN GENERAL
-    # ========================================================
 
     lineas.append(
         f"Equipos: {nombre_a} vs {nombre_b}"
@@ -927,7 +1986,7 @@ def generar_texto_copiable(
     lineas.append("")
 
     # ========================================================
-    # FUNCIÓN INTERNA PARA CONSTRUIR PARTIDO
+    # FUNCIÓN INTERNA PARTIDO
     # ========================================================
 
     def texto_partido(
@@ -985,10 +2044,6 @@ def generar_texto_copiable(
             evento
         )
 
-        estadisticas = obtener_estadisticas(
-            evento
-        )
-
         resultado.append(
             f"Fecha: {fecha}"
         )
@@ -1009,6 +2064,178 @@ def generar_texto_copiable(
             resultado.append(
                 f"Resultado: {marcador}"
             )
+
+        # ====================================================
+        # GOLES
+        # ====================================================
+
+        goles = obtener_goles(
+            evento
+        )
+
+        if goles:
+
+            resultado.append(
+                "Goles:"
+            )
+
+            for gol in goles:
+
+                linea = (
+                    f"- {gol['minuto']}' "
+                    f"{gol['jugador']} "
+                    f"({gol['equipo']})"
+                )
+
+                if gol.get(
+                    "tipo"
+                ):
+
+                    linea += (
+                        f" — {gol['tipo']}"
+                    )
+
+                resultado.append(
+                    linea
+                )
+
+        # ====================================================
+        # ALINEACIONES
+        # ====================================================
+
+        alineaciones = obtener_alineaciones(
+            evento
+        )
+
+        if alineaciones:
+
+            resultado.append(
+                "Alineaciones:"
+            )
+
+            for side, nombre_equipo in [
+                (
+                    "home",
+                    local
+                ),
+                (
+                    "away",
+                    visitante
+                )
+            ]:
+
+                alineacion = (
+                    extraer_alineacion_equipo(
+                        alineaciones,
+                        side
+                    )
+                )
+
+                if not alineacion:
+                    continue
+
+                resultado.append(
+                    f"{nombre_equipo}:"
+                )
+
+                formacion = alineacion.get(
+                    "formacion"
+                )
+
+                if formacion:
+
+                    resultado.append(
+                        f"- Formación: "
+                        f"{formacion}"
+                    )
+
+                titulares = alineacion.get(
+                    "titulares",
+                    []
+                )
+
+                suplentes = alineacion.get(
+                    "suplentes",
+                    []
+                )
+
+                if titulares:
+
+                    resultado.append(
+                        "- Titulares: "
+                        +
+                        ", ".join(
+                            titulares
+                        )
+                    )
+
+                if suplentes:
+
+                    resultado.append(
+                        "- Suplentes: "
+                        +
+                        ", ".join(
+                            suplentes
+                        )
+                    )
+
+        # ====================================================
+        # CAMBIOS
+        # ====================================================
+
+        home_id = (
+            evento
+            .get("homeTeam", {})
+            .get("id")
+        )
+
+        away_id = (
+            evento
+            .get("awayTeam", {})
+            .get("id")
+        )
+
+        cambios_home = obtener_cambios(
+            evento,
+            home_id
+        )
+
+        cambios_away = obtener_cambios(
+            evento,
+            away_id
+        )
+
+        if cambios_home or cambios_away:
+
+            resultado.append(
+                "Cambios:"
+            )
+
+            for cambio in cambios_home:
+
+                resultado.append(
+                    f"- {local}: "
+                    f"{cambio['minuto']}' "
+                    f"entró {cambio['entro']} "
+                    f"por {cambio['salio']}"
+                )
+
+            for cambio in cambios_away:
+
+                resultado.append(
+                    f"- {visitante}: "
+                    f"{cambio['minuto']}' "
+                    f"entró {cambio['entro']} "
+                    f"por {cambio['salio']}"
+                )
+
+        # ====================================================
+        # ESTADÍSTICAS
+        # ====================================================
+
+        estadisticas = obtener_estadisticas(
+            evento
+        )
 
         posesion = estadisticas.get(
             "Posesión"
@@ -1045,8 +2272,7 @@ def generar_texto_copiable(
         else:
 
             resultado.append(
-                "Posesión: "
-                "Datos no disponibles"
+                "Posesión: Datos no disponibles"
             )
 
         if corners:
@@ -1075,8 +2301,7 @@ def generar_texto_copiable(
         else:
 
             resultado.append(
-                "Faltas: "
-                "Datos no disponibles"
+                "Faltas: Datos no disponibles"
             )
 
         if tarjetas:
@@ -1105,8 +2330,7 @@ def generar_texto_copiable(
         else:
 
             resultado.append(
-                "Tiros a puerta: "
-                "Datos no disponibles"
+                "Tiros a puerta: Datos no disponibles"
             )
 
         if fueras:
@@ -1129,6 +2353,364 @@ def generar_texto_copiable(
         return resultado
 
     # ========================================================
+    # PRÓXIMO H2H
+    # ========================================================
+
+    proximo_h2h = datos.get(
+        "proximo_h2h"
+    )
+
+    if proximo_h2h:
+
+        lineas.append(
+            "🔜 PRÓXIMO ENFRENTAMIENTO"
+        )
+
+        lineas.append("")
+
+        local = (
+            proximo_h2h
+            .get("homeTeam", {})
+            .get("name")
+        )
+
+        visitante = (
+            proximo_h2h
+            .get("awayTeam", {})
+            .get("name")
+        )
+
+        torneo = (
+            proximo_h2h
+            .get("uniqueTournament", {})
+            .get("name")
+        )
+
+        if not torneo:
+
+            torneo = (
+                proximo_h2h
+                .get("tournament", {})
+                .get("name")
+            )
+
+        lineas.append(
+            f"Fecha y hora: "
+            f"{formatear_fecha_hora(proximo_h2h)}"
+        )
+
+        lineas.append(
+            f"Partido: "
+            f"{local} vs {visitante}"
+        )
+
+        if torneo:
+
+            lineas.append(
+                f"Competición: {torneo}"
+            )
+
+        lineas.append("")
+
+    # ========================================================
+    # PRÓXIMO EQUIPO A
+    # ========================================================
+
+    proximo_a = datos.get(
+        "proximo_a"
+    )
+
+    if proximo_a:
+
+        lineas.append(
+            f"🔜 PRÓXIMO PARTIDO DE {nombre_a}"
+        )
+
+        lineas.append("")
+
+        local = (
+            proximo_a
+            .get("homeTeam", {})
+            .get("name")
+        )
+
+        visitante = (
+            proximo_a
+            .get("awayTeam", {})
+            .get("name")
+        )
+
+        lineas.append(
+            f"Fecha y hora: "
+            f"{formatear_fecha_hora(proximo_a)}"
+        )
+
+        lineas.append(
+            f"Partido: "
+            f"{local} vs {visitante}"
+        )
+
+        torneo = (
+            proximo_a
+            .get("uniqueTournament", {})
+            .get("name")
+        )
+
+        if not torneo:
+
+            torneo = (
+                proximo_a
+                .get("tournament", {})
+                .get("name")
+            )
+
+        if torneo:
+
+            lineas.append(
+                f"Competición: {torneo}"
+            )
+
+        home_id = (
+            proximo_a
+            .get("homeTeam", {})
+            .get("id")
+        )
+
+        away_id = (
+            proximo_a
+            .get("awayTeam", {})
+            .get("id")
+        )
+
+        entrenador_home = (
+            obtener_entrenador_equipo(
+                home_id
+            )
+        )
+
+        entrenador_away = (
+            obtener_entrenador_equipo(
+                away_id
+            )
+        )
+
+        if entrenador_home:
+
+            lineas.append(
+                f"Entrenador {local}: "
+                f"{entrenador_home}"
+            )
+
+        if entrenador_away:
+
+            lineas.append(
+                f"Entrenador {visitante}: "
+                f"{entrenador_away}"
+            )
+
+        alineaciones = obtener_alineaciones(
+            proximo_a
+        )
+
+        if alineaciones:
+
+            lineas.append(
+                "Alineaciones:"
+            )
+
+            for side, nombre_equipo in [
+                ("home", local),
+                ("away", visitante)
+            ]:
+
+                alineacion = (
+                    extraer_alineacion_equipo(
+                        alineaciones,
+                        side
+                    )
+                )
+
+                if not alineacion:
+                    continue
+
+                formacion = alineacion.get(
+                    "formacion"
+                )
+
+                if formacion:
+
+                    lineas.append(
+                        f"- {nombre_equipo} "
+                        f"({formacion})"
+                    )
+
+                titulares = alineacion.get(
+                    "titulares",
+                    []
+                )
+
+                if titulares:
+
+                    lineas.append(
+                        "- Titulares: "
+                        +
+                        ", ".join(
+                            titulares
+                        )
+                    )
+
+        lineas.append("")
+
+    # ========================================================
+    # PRÓXIMO EQUIPO B
+    # ========================================================
+
+    proximo_b = datos.get(
+        "proximo_b"
+    )
+
+    if proximo_b:
+
+        lineas.append(
+            f"🔜 PRÓXIMO PARTIDO DE {nombre_b}"
+        )
+
+        lineas.append("")
+
+        local = (
+            proximo_b
+            .get("homeTeam", {})
+            .get("name")
+        )
+
+        visitante = (
+            proximo_b
+            .get("awayTeam", {})
+            .get("name")
+        )
+
+        lineas.append(
+            f"Fecha y hora: "
+            f"{formatear_fecha_hora(proximo_b)}"
+        )
+
+        lineas.append(
+            f"Partido: "
+            f"{local} vs {visitante}"
+        )
+
+        torneo = (
+            proximo_b
+            .get("uniqueTournament", {})
+            .get("name")
+        )
+
+        if not torneo:
+
+            torneo = (
+                proximo_b
+                .get("tournament", {})
+                .get("name")
+            )
+
+        if torneo:
+
+            lineas.append(
+                f"Competición: {torneo}"
+            )
+
+        home_id = (
+            proximo_b
+            .get("homeTeam", {})
+            .get("id")
+        )
+
+        away_id = (
+            proximo_b
+            .get("awayTeam", {})
+            .get("id")
+        )
+
+        entrenador_home = (
+            obtener_entrenador_equipo(
+                home_id
+            )
+        )
+
+        entrenador_away = (
+            obtener_entrenador_equipo(
+                away_id
+            )
+        )
+
+        if entrenador_home:
+
+            lineas.append(
+                f"Entrenador {local}: "
+                f"{entrenador_home}"
+            )
+
+        if entrenador_away:
+
+            lineas.append(
+                f"Entrenador {visitante}: "
+                f"{entrenador_away}"
+            )
+
+        alineaciones = obtener_alineaciones(
+            proximo_b
+        )
+
+        if alineaciones:
+
+            lineas.append(
+                "Alineaciones:"
+            )
+
+            for side, nombre_equipo in [
+                ("home", local),
+                ("away", visitante)
+            ]:
+
+                alineacion = (
+                    extraer_alineacion_equipo(
+                        alineaciones,
+                        side
+                    )
+                )
+
+                if not alineacion:
+                    continue
+
+                formacion = alineacion.get(
+                    "formacion"
+                )
+
+                if formacion:
+
+                    lineas.append(
+                        f"- {nombre_equipo} "
+                        f"({formacion})"
+                    )
+
+                titulares = alineacion.get(
+                    "titulares",
+                    []
+                )
+
+                if titulares:
+
+                    lineas.append(
+                        "- Titulares: "
+                        +
+                        ", ".join(
+                            titulares
+                        )
+                    )
+
+        lineas.append("")
+
+    # ========================================================
     # H2H
     # ========================================================
 
@@ -1142,7 +2724,9 @@ def generar_texto_copiable(
         texto_partido(
             f"🏠 Último enfrentamiento "
             f"con {nombre_a} como LOCAL",
-            datos.get("h2h_a_local")
+            datos.get(
+                "h2h_a_local"
+            )
         )
     )
 
@@ -1150,7 +2734,9 @@ def generar_texto_copiable(
         texto_partido(
             f"✈️ Último enfrentamiento "
             f"con {nombre_a} como VISITANTE",
-            datos.get("h2h_a_visitante")
+            datos.get(
+                "h2h_a_visitante"
+            )
         )
     )
 
@@ -1167,14 +2753,18 @@ def generar_texto_copiable(
     lineas.extend(
         texto_partido(
             "🏠 Último partido como LOCAL",
-            datos.get("local_a")
+            datos.get(
+                "local_a"
+            )
         )
     )
 
     lineas.extend(
         texto_partido(
             "✈️ Último partido como VISITANTE",
-            datos.get("visitante_a")
+            datos.get(
+                "visitante_a"
+            )
         )
     )
 
@@ -1191,14 +2781,18 @@ def generar_texto_copiable(
     lineas.extend(
         texto_partido(
             "🏠 Último partido como LOCAL",
-            datos.get("local_b")
+            datos.get(
+                "local_b"
+            )
         )
     )
 
     lineas.extend(
         texto_partido(
             "✈️ Último partido como VISITANTE",
-            datos.get("visitante_b")
+            datos.get(
+                "visitante_b"
+            )
         )
     )
 
@@ -1309,7 +2903,7 @@ def mostrar_boton_copiar(texto):
 
 
 # ============================================================
-# BOTÓN
+# BOTÓN BUSCAR
 # ============================================================
 
 if st.button(
@@ -1337,16 +2931,6 @@ if st.button(
 
         st.stop()
 
-    # ========================================================
-    # IMPORTANTE:
-    #
-    # SOLAMENTE se exige liga cuando se selecciona
-    # "Competición específica".
-    #
-    # Si es "Todas las competiciones", liga = "TODAS"
-    # y no se ejecuta esta validación.
-    # ========================================================
-
     if (
         modo_competicion
         == "Competición específica"
@@ -1361,7 +2945,7 @@ if st.button(
         st.stop()
 
     # ========================================================
-    # RANGO DE BÚSQUEDA
+    # RANGO
     # ========================================================
 
     fecha_inicio = date(
@@ -1381,10 +2965,6 @@ if st.button(
 
         st.stop()
 
-    # ========================================================
-    # INFORMACIÓN DEL RANGO
-    # ========================================================
-
     st.info(
         f"📅 Buscando partidos desde "
         f"**{fecha_inicio.strftime('%d/%m/%Y')}** "
@@ -1392,15 +2972,10 @@ if st.button(
         f"**{fecha_fin.strftime('%d/%m/%Y')}**."
     )
 
-    # ========================================================
-    # INFORMACIÓN DE COMPETICIÓN
-    # ========================================================
-
     if modo_competicion == "Todas las competiciones":
 
         st.info(
-            "🌎 Modo: **todas las competiciones**. "
-            "No se filtrarán los partidos por liga o copa."
+            "🌎 Modo: **todas las competiciones**."
         )
 
     else:
@@ -1417,42 +2992,6 @@ if st.button(
     with st.spinner(
         "Buscando información en Sofascore..."
     ):
-
-        print(
-            "===== INICIO DE BUSQUEDA ====="
-        )
-
-        print(
-            "Equipo A:",
-            equipo_a.strip()
-        )
-
-        print(
-            "Equipo B:",
-            equipo_b.strip()
-        )
-
-        print(
-            "Liga:",
-            liga.strip()
-        )
-
-        print(
-            "Fecha:",
-            fecha_partido
-        )
-
-        print(
-            "Modo:",
-            modo_competicion
-        )
-
-        print(
-            "RANGO:",
-            fecha_inicio,
-            "->",
-            fecha_fin
-        )
 
         datos = analizar_partido(
             equipo_a.strip(),
@@ -1484,7 +3023,7 @@ if st.button(
         st.stop()
 
     # ========================================================
-    # NOMBRES ENCONTRADOS
+    # NOMBRES
     # ========================================================
 
     nombre_a = datos.get(
@@ -1496,10 +3035,6 @@ if st.button(
         "equipo_b",
         equipo_b
     )
-
-    # ========================================================
-    # INFORMACIÓN ENCONTRADA
-    # ========================================================
 
     st.success(
         f"Equipos encontrados: "
@@ -1522,7 +3057,66 @@ if st.button(
         )
 
     # ========================================================
-    # BOTÓN PARA COPIAR TODO EL TEXTO
+    # OBTENER IDS PARA PRÓXIMOS PARTIDOS
+    # ========================================================
+
+    equipo_a_api = buscar_equipo(
+        nombre_a
+    )
+
+    equipo_b_api = buscar_equipo(
+        nombre_b
+    )
+
+    id_a = (
+        equipo_a_api.get("id")
+        if equipo_a_api
+        else None
+    )
+
+    id_b = (
+        equipo_b_api.get("id")
+        if equipo_b_api
+        else None
+    )
+
+    # ========================================================
+    # PRÓXIMOS PARTIDOS
+    # ========================================================
+
+    proximo_h2h = None
+    proximo_a = None
+    proximo_b = None
+
+    if id_a and id_b:
+
+        proximo_h2h = obtener_proximo_h2h(
+            id_a,
+            id_b
+        )
+
+        proximos_a = obtener_proximos_partidos(
+            id_a
+        )
+
+        proximos_b = obtener_proximos_partidos(
+            id_b
+        )
+
+        if proximos_a:
+
+            proximo_a = proximos_a[0]
+
+        if proximos_b:
+
+            proximo_b = proximos_b[0]
+
+    datos["proximo_h2h"] = proximo_h2h
+    datos["proximo_a"] = proximo_a
+    datos["proximo_b"] = proximo_b
+
+    # ========================================================
+    # TEXTO COPIABLE
     # ========================================================
 
     texto_completo = generar_texto_copiable(
@@ -1532,9 +3126,64 @@ if st.button(
         liga
     )
 
+    # ========================================================
+    # BOTÓN COPIAR ARRIBA
+    # ========================================================
+
     mostrar_boton_copiar(
         texto_completo
     )
+
+    # ========================================================
+    # PRÓXIMO ENFRENTAMIENTO
+    # ========================================================
+
+    if proximo_h2h:
+
+        st.divider()
+
+        st.header(
+            "🔜 Próximo enfrentamiento"
+        )
+
+        mostrar_proximo_partido(
+            proximo_h2h,
+            f"{nombre_a} vs {nombre_b}"
+        )
+
+    # ========================================================
+    # PRÓXIMO PARTIDO EQUIPO A
+    # ========================================================
+
+    if proximo_a:
+
+        st.divider()
+
+        st.header(
+            f"🔜 Próximo partido de {nombre_a}"
+        )
+
+        mostrar_proximo_partido(
+            proximo_a,
+            f"Próximo partido de {nombre_a}"
+        )
+
+    # ========================================================
+    # PRÓXIMO PARTIDO EQUIPO B
+    # ========================================================
+
+    if proximo_b:
+
+        st.divider()
+
+        st.header(
+            f"🔜 Próximo partido de {nombre_b}"
+        )
+
+        mostrar_proximo_partido(
+            proximo_b,
+            f"Próximo partido de {nombre_b}"
+        )
 
     # ========================================================
     # H2H
@@ -1547,7 +3196,7 @@ if st.button(
     )
 
     # ========================================================
-    # H2H EQUIPO A LOCAL
+    # H2H LOCAL
     # ========================================================
 
     st.subheader(
@@ -1574,7 +3223,7 @@ if st.button(
         )
 
     # ========================================================
-    # H2H EQUIPO A VISITANTE
+    # H2H VISITANTE
     # ========================================================
 
     st.subheader(
@@ -1610,10 +3259,6 @@ if st.button(
         f"⚽ {nombre_a}"
     )
 
-    # ========================================================
-    # EQUIPO A LOCAL
-    # ========================================================
-
     st.subheader(
         "🏠 Último partido como LOCAL"
     )
@@ -1639,10 +3284,6 @@ if st.button(
             "desde el 01/01/2020 hasta la fecha "
             "seleccionada."
         )
-
-    # ========================================================
-    # EQUIPO A VISITANTE
-    # ========================================================
 
     st.subheader(
         "✈️ Último partido como VISITANTE"
@@ -1680,10 +3321,6 @@ if st.button(
         f"⚽ {nombre_b}"
     )
 
-    # ========================================================
-    # EQUIPO B LOCAL
-    # ========================================================
-
     st.subheader(
         "🏠 Último partido como LOCAL"
     )
@@ -1709,10 +3346,6 @@ if st.button(
             "desde el 01/01/2020 hasta la fecha "
             "seleccionada."
         )
-
-    # ========================================================
-    # EQUIPO B VISITANTE
-    # ========================================================
 
     st.subheader(
         "✈️ Último partido como VISITANTE"
