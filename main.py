@@ -538,9 +538,9 @@ def obtener_h2h(
 
     for evento in historial:
 
-        # ----------------------------------------------------
+        # ====================================================
         # FECHA
-        # ----------------------------------------------------
+        # ====================================================
 
         if not es_anterior_a_fecha(
             evento,
@@ -548,9 +548,16 @@ def obtener_h2h(
         ):
             continue
 
-        # ----------------------------------------------------
-        # LIGA
-        # ----------------------------------------------------
+        # ====================================================
+        # PARTIDO FINALIZADO
+        # ====================================================
+
+        if not partido_valido(evento):
+            continue
+
+        # ====================================================
+        # FILTRO DE LIGA
+        # ====================================================
 
         if not pertenece_a_liga(
             evento,
@@ -558,39 +565,78 @@ def obtener_h2h(
         ):
             continue
 
-        # ----------------------------------------------------
+        # ====================================================
         # EQUIPOS
-        # ----------------------------------------------------
+        # ====================================================
 
         local = (
             evento
             .get("homeTeam", {})
             .get("name", "")
+            .strip()
+            .lower()
         )
 
         visitante = (
             evento
             .get("awayTeam", {})
             .get("name", "")
+            .strip()
+            .lower()
         )
 
-        # ----------------------------------------------------
-        # H2H
-        # ----------------------------------------------------
+        equipo_a = (
+            equipo_local
+            .strip()
+            .lower()
+        )
 
-        if (
-            local.lower()
-            == equipo_local.lower()
-            and
-            visitante.lower()
-            == equipo_visitante.lower()
-            and
-            partido_valido(evento)
-        ):
+        equipo_b = (
+            equipo_visitante
+            .strip()
+            .lower()
+        )
+
+        # ====================================================
+        # H2H EN CUALQUIER DIRECCIÓN
+        # ====================================================
+
+        es_h2h = (
+            (
+                local == equipo_a
+                and visitante == equipo_b
+            )
+            or
+            (
+                local == equipo_b
+                and visitante == equipo_a
+            )
+        )
+
+        if es_h2h:
+
+            print(
+                "H2H ENCONTRADO:",
+                evento.get("id"),
+                "|",
+                evento
+                .get("homeTeam", {})
+                .get("name"),
+                "vs",
+                evento
+                .get("awayTeam", {})
+                .get("name"),
+                "| LIGA:",
+                obtener_nombre_liga(evento)
+            )
 
             encontrados.append(
                 evento
             )
+
+    # ========================================================
+    # ORDENAR DEL MÁS RECIENTE AL MÁS ANTIGUO
+    # ========================================================
 
     encontrados.sort(
         key=lambda x:
@@ -601,8 +647,37 @@ def obtener_h2h(
         reverse=True
     )
 
-    return encontrados
+    # ========================================================
+    # ELIMINAR DUPLICADOS
+    # ========================================================
 
+    unicos = {}
+
+    for evento in encontrados:
+
+        event_id = evento.get("id")
+
+        if event_id:
+            unicos[event_id] = evento
+
+    encontrados = list(
+        unicos.values()
+    )
+
+    encontrados.sort(
+        key=lambda x:
+        x.get(
+            "startTimestamp",
+            0
+        ),
+        reverse=True
+    )
+
+    # ========================================================
+    # ÚLTIMOS 2 H2H
+    # ========================================================
+
+    return encontrados[:2]
 
 # ============================================================
 # DOS ÚLTIMOS H2H
@@ -627,29 +702,34 @@ def obtener_dos_h2h(
 
     h2h_b = obtener_h2h(
         historial_b,
-        equipo_b,
         equipo_a,
+        equipo_b,
         fecha_limite,
         liga
     )
 
     todos = h2h_a + h2h_b
 
+    # ========================================================
+    # ELIMINAR DUPLICADOS
+    # ========================================================
+
     unicos = {}
 
     for evento in todos:
 
-        event_id = evento.get(
-            "id"
-        )
+        event_id = evento.get("id")
 
         if event_id:
-
             unicos[event_id] = evento
 
     todos = list(
         unicos.values()
     )
+
+    # ========================================================
+    # ORDENAR
+    # ========================================================
 
     todos.sort(
         key=lambda x:
@@ -660,8 +740,11 @@ def obtener_dos_h2h(
         reverse=True
     )
 
-    return todos[:2]
+    # ========================================================
+    # DEVOLVER LOS 2 MÁS RECIENTES
+    # ========================================================
 
+    return todos[:2]
 
 # ============================================================
 # ÚLTIMO PARTIDO COMO LOCAL
