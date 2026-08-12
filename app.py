@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import date
 
 from main import analizar_partido, obtener_estadisticas
-
+from main import obtener_json
 
 # ============================================================
 # CONFIGURACIÓN
@@ -20,6 +20,23 @@ st.set_page_config(
 # ============================================================
 
 st.title("⚽ Estadísticas de Fútbol")
+
+st.subheader("Prueba de conexión")
+
+if st.button("Probar Sofascore"):
+
+    url = "https://www.sofascore.com/api/v1/search/all?q=Wuhan"
+
+    datos = obtener_json(url)
+
+    if datos is None:
+
+        st.error("Sofascore no respondió")
+
+    else:
+
+        st.success("Sofascore respondió")
+        st.json(datos)
 
 st.write(
     "Consulta estadísticas de los últimos partidos "
