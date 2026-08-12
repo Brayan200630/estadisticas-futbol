@@ -1,5 +1,5 @@
 from curl_cffi import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from urllib.parse import quote
 
 
@@ -10,6 +10,10 @@ from urllib.parse import quote
 BASE_URL = "https://www.sofascore.com/api/v1"
 
 session = requests.Session()
+
+# IMPORTANTE:
+# Nunca utilizar partidos anteriores a esta fecha.
+FECHA_MINIMA = date(2020, 1, 1)
 
 
 # ============================================================
@@ -221,15 +225,9 @@ def convertir_fecha_limite(fecha_limite):
 
         return fecha_limite.date()
 
-    if hasattr(
+    if isinstance(
         fecha_limite,
-        "year"
-    ) and hasattr(
-        fecha_limite,
-        "month"
-    ) and hasattr(
-        fecha_limite,
-        "day"
+        date
     ):
 
         return fecha_limite
@@ -279,10 +277,13 @@ def obtener_timestamp(evento):
 
 
 # ============================================================
-# PARTIDO ANTERIOR A FECHA
+# COMPROBAR RANGO DE FECHA
+#
+# Desde 01/01/2020 hasta el día anterior
+# a la fecha del partido.
 # ============================================================
 
-def es_anterior_a_fecha(
+def fecha_valida_para_analisis(
     evento,
     fecha_limite
 ):
@@ -301,7 +302,30 @@ def es_anterior_a_fecha(
     if not fecha_limite_date:
         return False
 
-    return fecha_evento < fecha_limite_date
+    # Nunca aceptar antes de 2020
+    if fecha_evento < FECHA_MINIMA:
+        return False
+
+    # Nunca aceptar el mismo día o después
+    if fecha_evento >= fecha_limite_date:
+        return False
+
+    return True
+
+
+# ============================================================
+# PARTIDO ANTERIOR A FECHA
+# ============================================================
+
+def es_anterior_a_fecha(
+    evento,
+    fecha_limite
+):
+
+    return fecha_valida_para_analisis(
+        evento,
+        fecha_limite
+    )
 
 
 # ============================================================
@@ -366,6 +390,10 @@ def obtener_nombre_liga(evento):
     if not evento:
         return ""
 
+    # --------------------------------------------------------
+    # uniqueTournament
+    # --------------------------------------------------------
+
     unique = evento.get(
         "uniqueTournament",
         {}
@@ -383,6 +411,10 @@ def obtener_nombre_liga(evento):
 
         if nombre:
             return nombre
+
+    # --------------------------------------------------------
+    # tournament
+    # --------------------------------------------------------
 
     tournament = evento.get(
         "tournament",
@@ -412,16 +444,19 @@ def obtener_nombre_liga(evento):
             dict
         ):
 
-            return unique.get(
+            nombre = unique.get(
                 "name",
                 ""
             )
+
+            if nombre:
+                return nombre
 
     return ""
 
 
 # ============================================================
-# NORMALIZAR TEXTO DE LIGA
+# NORMALIZAR LIGA
 # ============================================================
 
 def normalizar_liga(texto):
@@ -474,15 +509,24 @@ def pertenece_a_liga(
         liga
     )
 
+    print(
+        "LIGA EVENTO:",
+        repr(nombre_liga),
+        "| LIGA BUSCADA:",
+        repr(liga_buscada)
+    )
+
     if not nombre_liga:
         return False
 
     if not liga_buscada:
         return False
 
+    # Coincidencia exacta
     if nombre_liga == liga_buscada:
         return True
 
+    # Coincidencia parcial
     if (
         liga_buscada in nombre_liga
         or
@@ -504,7 +548,10 @@ def obtener_historial(team_id):
 
     pagina = 0
 
-    max_paginas = 30
+    # Ya no necesitamos 30 páginas.
+    # 10 páginas = suficiente margen para llegar hasta 2020
+    # en la mayoría de equipos.
+    max_paginas = 10
 
     while pagina < max_paginas:
 
@@ -538,6 +585,43 @@ def obtener_historial(team_id):
         partidos.extend(
             eventos
         )
+
+        # ----------------------------------------------------
+        # Si ya encontramos eventos que llegan a 2020,
+        # podemos dejar de pedir páginas.
+        # ----------------------------------------------------
+
+        fechas = []
+
+        for evento in eventos:
+
+            fecha = obtener_fecha_date(
+                evento
+            )
+
+            if fecha:
+                fechas.append(
+                    fecha
+                )
+
+        if fechas:
+
+            fecha_mas_antigua = min(
+                fechas
+            )
+
+            print(
+                "FECHA MÁS ANTIGUA DE ESTA PÁGINA:",
+                fecha_mas_antigua
+            )
+
+            if fecha_mas_antigua <= FECHA_MINIMA:
+
+                print(
+                    "SE ALCANZÓ EL LÍMITE DEL 01/01/2020"
+                )
+
+                break
 
         if not datos.get(
             "hasNextPage",
@@ -578,7 +662,7 @@ def eliminar_duplicados(eventos):
 
 
 # ============================================================
-# ORDENAR POR FECHA MÁS RECIENTE
+# ORDENAR POR FECHA
 # ============================================================
 
 def ordenar_por_fecha(eventos):
@@ -637,6 +721,10 @@ def es_enfrentamiento(
 #
 # 1. Último enfrentamiento con A LOCAL
 # 2. Último enfrentamiento con A VISITANTE
+#
+# SOLO:
+#
+# 01/01/2020 <= fecha < fecha del partido
 # ============================================================
 
 def obtener_h2h_por_localia(
@@ -665,28 +753,36 @@ def obtener_h2h_por_localia(
         if not evento:
             continue
 
+        # Exactamente los dos equipos
         if not es_enfrentamiento(
             evento,
             equipo_a_id,
             equipo_b_id
         ):
+
             continue
 
+        # Finalizado
         if not partido_valido(
             evento
         ):
+
             continue
 
+        # Desde 2020 y antes del partido
         if not es_anterior_a_fecha(
             evento,
             fecha_limite
         ):
+
             continue
 
+        # Misma liga
         if not pertenece_a_liga(
             evento,
             liga
         ):
+
             continue
 
         candidatos.append(
@@ -724,7 +820,15 @@ def obtener_h2h_por_localia(
         "===================================="
     )
 
+    # ========================================================
+    # ÚLTIMO A COMO LOCAL
+    # ========================================================
+
     h2h_a_local = None
+
+    # ========================================================
+    # ÚLTIMO A COMO VISITANTE
+    # ========================================================
 
     h2h_a_visitante = None
 
@@ -790,21 +894,27 @@ def ultimo_local(
         if not evento:
             continue
 
+        # Finalizado
         if not partido_valido(
             evento
         ):
+
             continue
 
+        # Desde 2020 y antes de la fecha
         if not es_anterior_a_fecha(
             evento,
             fecha_limite
         ):
+
             continue
 
+        # Misma liga
         if not pertenece_a_liga(
             evento,
             liga
         ):
+
             continue
 
         home_id = (
@@ -864,21 +974,27 @@ def ultimo_visitante(
         if not evento:
             continue
 
+        # Finalizado
         if not partido_valido(
             evento
         ):
+
             continue
 
+        # Desde 2020 y antes de la fecha
         if not es_anterior_a_fecha(
             evento,
             fecha_limite
         ):
+
             continue
 
+        # Misma liga
         if not pertenece_a_liga(
             evento,
             liga
         ):
+
             continue
 
         away_id = (
@@ -975,6 +1091,10 @@ def obtener_estadisticas(evento):
 
     periodo = None
 
+    # ========================================================
+    # BUSCAR ALL
+    # ========================================================
+
     for item in periodos:
 
         if item.get(
@@ -984,6 +1104,10 @@ def obtener_estadisticas(evento):
             periodo = item
 
             break
+
+    # ========================================================
+    # RESPALDO
+    # ========================================================
 
     if periodo is None:
 
@@ -1001,6 +1125,10 @@ def obtener_estadisticas(evento):
     )
 
     estadisticas = {}
+
+    # ========================================================
+    # EXTRAER ESTADÍSTICAS
+    # ========================================================
 
     for grupo in grupos:
 
@@ -1042,6 +1170,10 @@ def obtener_estadisticas(evento):
         "offsides":
             "Fueras de juego"
     }
+
+    # ========================================================
+    # CONVERTIR
+    # ========================================================
 
     for (
         nombre_api,
@@ -1131,6 +1263,17 @@ def analizar_partido(
     )
 
     # ========================================================
+    # VALIDAR QUE LA FECHA SEA POSTERIOR A 2020
+    # ========================================================
+
+    if fecha_limite <= FECHA_MINIMA:
+
+        return {
+            "error":
+            "La fecha del partido debe ser posterior al 01/01/2020."
+        }
+
+    # ========================================================
     # BUSCAR EQUIPO A
     # ========================================================
 
@@ -1208,6 +1351,13 @@ def analizar_partido(
     print(
         "FECHA DEL PARTIDO:",
         fecha_partido_str
+    )
+
+    print(
+        "RANGO HISTÓRICO:",
+        FECHA_MINIMA,
+        "→",
+        fecha_limite
     )
 
     print(
@@ -1318,7 +1468,7 @@ def analizar_partido(
         )
 
     # ========================================================
-    # DEBUG
+    # DEBUG FINAL
     # ========================================================
 
     print(

@@ -150,7 +150,6 @@ def mostrar_partido(evento):
             .get("name")
         )
 
-
     if torneo:
 
         st.write(
@@ -193,7 +192,6 @@ def mostrar_partido(evento):
         .get("current")
     )
 
-
     if (
         home_score is not None
         and
@@ -213,7 +211,6 @@ def mostrar_partido(evento):
     estadisticas = obtener_estadisticas(
         evento
     )
-
 
     posesion = estadisticas.get(
         "Posesión"
@@ -401,6 +398,41 @@ if st.button(
 
 
     # ========================================================
+    # RANGO DE BÚSQUEDA
+    # ========================================================
+
+    fecha_inicio = date(
+        2020,
+        1,
+        1
+    )
+
+    fecha_fin = fecha_partido
+
+
+    if fecha_fin <= fecha_inicio:
+
+        st.error(
+            "La fecha del partido debe ser posterior "
+            "al 01/01/2020."
+        )
+
+        st.stop()
+
+
+    # ========================================================
+    # INFORMACIÓN DEL RANGO
+    # ========================================================
+
+    st.info(
+        f"📅 Buscando partidos desde "
+        f"**{fecha_inicio.strftime('%d/%m/%Y')}** "
+        f"hasta antes del "
+        f"**{fecha_fin.strftime('%d/%m/%Y')}**."
+    )
+
+
+    # ========================================================
     # BÚSQUEDA
     # ========================================================
 
@@ -430,6 +462,13 @@ if st.button(
         print(
             "Fecha:",
             fecha_partido
+        )
+
+        print(
+            "RANGO:",
+            fecha_inicio,
+            "->",
+            fecha_fin
         )
 
 
@@ -514,7 +553,6 @@ if st.button(
         "h2h_a_local"
     )
 
-
     if h2h_a_local:
 
         mostrar_partido(
@@ -526,8 +564,8 @@ if st.button(
         st.info(
             "No se encontró un enfrentamiento "
             f"de {nombre_a} como local en la "
-            "liga seleccionada antes de la fecha "
-            "del partido."
+            "liga seleccionada dentro del período "
+            "01/01/2020 → fecha del partido."
         )
 
 
@@ -544,7 +582,6 @@ if st.button(
         "h2h_a_visitante"
     )
 
-
     if h2h_a_visitante:
 
         mostrar_partido(
@@ -556,8 +593,8 @@ if st.button(
         st.info(
             "No se encontró un enfrentamiento "
             f"de {nombre_a} como visitante en la "
-            "liga seleccionada antes de la fecha "
-            "del partido."
+            "liga seleccionada dentro del período "
+            "01/01/2020 → fecha del partido."
         )
 
 
@@ -584,11 +621,9 @@ if st.button(
         "Las estadísticas fueron las siguientes:"
     )
 
-
     local_a = datos.get(
         "local_a"
     )
-
 
     if local_a:
 
@@ -599,7 +634,9 @@ if st.button(
     else:
 
         st.info(
-            "No se encontró un partido válido."
+            "No se encontró un partido válido "
+            "desde el 01/01/2020 hasta la fecha "
+            "seleccionada."
         )
 
 
@@ -615,11 +652,9 @@ if st.button(
         "Las estadísticas fueron las siguientes:"
     )
 
-
     visitante_a = datos.get(
         "visitante_a"
     )
-
 
     if visitante_a:
 
@@ -630,7 +665,9 @@ if st.button(
     else:
 
         st.info(
-            "No se encontró un partido válido."
+            "No se encontró un partido válido "
+            "desde el 01/01/2020 hasta la fecha "
+            "seleccionada."
         )
 
 
@@ -657,11 +694,9 @@ if st.button(
         "Las estadísticas fueron las siguientes:"
     )
 
-
     local_b = datos.get(
         "local_b"
     )
-
 
     if local_b:
 
@@ -672,7 +707,9 @@ if st.button(
     else:
 
         st.info(
-            "No se encontró un partido válido."
+            "No se encontró un partido válido "
+            "desde el 01/01/2020 hasta la fecha "
+            "seleccionada."
         )
 
 
@@ -688,11 +725,9 @@ if st.button(
         "Las estadísticas fueron las siguientes:"
     )
 
-
     visitante_b = datos.get(
         "visitante_b"
     )
-
 
     if visitante_b:
 
@@ -703,5 +738,7 @@ if st.button(
     else:
 
         st.info(
-            "No se encontró un partido válido."
+            "No se encontró un partido válido "
+            "desde el 01/01/2020 hasta la fecha "
+            "seleccionada."
         )
