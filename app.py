@@ -16,6 +16,7 @@ st.set_page_config(
     layout="centered"
 )
 
+
 BASE_URL = "https://www.sofascore.com/api/v1"
 
 
@@ -175,6 +176,7 @@ def buscar_ligas_app(nombre):
             "uniqueTournament",
             "tournament"
         }:
+
             continue
 
         entidad = resultado.get(
@@ -230,7 +232,10 @@ def buscar_ligas_app(nombre):
             {}
         )
 
-        if isinstance(category, dict):
+        if isinstance(
+            category,
+            dict
+        ):
 
             pais = category.get(
                 "name",
@@ -265,7 +270,9 @@ def buscar_ligas_app(nombre):
 # TÍTULO
 # ============================================================
 
-st.title("⚽ Estadísticas de Fútbol")
+st.title(
+    "⚽ Estadísticas de Fútbol"
+)
 
 st.write(
     "Consulta estadísticas de los últimos partidos "
@@ -277,7 +284,9 @@ st.write(
 # EQUIPO A
 # ============================================================
 
-st.subheader("Equipo A")
+st.subheader(
+    "Equipo A"
+)
 
 busqueda_a = st.text_input(
     "Buscar Equipo A",
@@ -324,7 +333,9 @@ else:
 # EQUIPO B
 # ============================================================
 
-st.subheader("Equipo B")
+st.subheader(
+    "Equipo B"
+)
 
 busqueda_b = st.text_input(
     "Buscar Equipo B",
@@ -371,7 +382,9 @@ else:
 # COMPETICIÓN
 # ============================================================
 
-st.subheader("Competición")
+st.subheader(
+    "Competición"
+)
 
 modo_competicion = st.radio(
     "¿Cómo quieres buscar los partidos?",
@@ -435,15 +448,14 @@ if modo_competicion == "Competición específica":
 else:
 
     # ========================================================
+    # TODAS LAS COMPETICIONES
+    #
     # IMPORTANTE:
-    #
-    # No usamos "TODAS".
-    #
-    # El main.py interpreta una cadena vacía como:
-    # TODAS LAS COMPETICIONES.
+    # Enviamos "TODAS" al main.py.
+    # No dejamos liga vacía.
     # ========================================================
 
-    liga = ""
+    liga = "TODAS"
 
     st.info(
         "🌎 Se buscarán los últimos partidos "
@@ -514,12 +526,14 @@ def obtener_resultado(evento):
         home_score,
         dict
     ):
+
         home_score = {}
 
     if not isinstance(
         away_score,
         dict
     ):
+
         away_score = {}
 
     # ========================================================
@@ -560,10 +574,6 @@ def obtener_resultado(evento):
         away_penalty is not None
     ):
 
-        # ----------------------------------------------------
-        # Resultado después de 90 minutos.
-        # ----------------------------------------------------
-
         home_regular = home_score.get(
             "normaltime"
         )
@@ -573,10 +583,7 @@ def obtener_resultado(evento):
         )
 
         # ----------------------------------------------------
-        # Si no existe normaltime, intentar overtime.
-        #
-        # Esto permite manejar partidos que llegaron
-        # a 120 minutos antes de los penales.
+        # Respaldo: overtime
         # ----------------------------------------------------
 
         if (
@@ -594,7 +601,7 @@ def obtener_resultado(evento):
             )
 
         # ----------------------------------------------------
-        # Último respaldo.
+        # Respaldo: period1
         # ----------------------------------------------------
 
         if (
@@ -612,7 +619,7 @@ def obtener_resultado(evento):
             )
 
         # ----------------------------------------------------
-        # Último respaldo absoluto.
+        # Último respaldo
         # ----------------------------------------------------
 
         if (
@@ -924,10 +931,19 @@ if st.button(
 
         st.stop()
 
+    # ========================================================
+    # IMPORTANTE:
+    #
+    # SOLAMENTE se exige liga cuando se selecciona
+    # "Competición específica".
+    #
+    # Si es "Todas las competiciones", liga = "TODAS"
+    # y no se ejecuta esta validación.
+    # ========================================================
+
     if (
         modo_competicion
-        ==
-        "Competición específica"
+        == "Competición específica"
         and
         not liga.strip()
     ):
@@ -1086,8 +1102,7 @@ if st.button(
 
     if (
         modo_competicion
-        ==
-        "Todas las competiciones"
+        == "Todas las competiciones"
     ):
 
         st.info(
