@@ -66,7 +66,7 @@ def buscar_equipo(nombre):
         []
     )
 
-    # Coincidencia exacta
+    # Primero buscamos coincidencia exacta
     for resultado in resultados:
 
         entidad = resultado.get(
@@ -77,24 +77,17 @@ def buscar_equipo(nombre):
         nombre_encontrado = entidad.get(
             "name",
             ""
-        )
-
-        deporte = entidad.get(
-            "sport",
-            {}
-        ).get(
-            "slug"
         )
 
         if (
             nombre_encontrado.lower()
             == nombre.lower()
-            and deporte == "football"
         ):
 
             return entidad
 
-    # Coincidencia parcial
+    # Si no hay coincidencia exacta,
+    # buscamos coincidencia parcial
     for resultado in resultados:
 
         entidad = resultado.get(
@@ -107,22 +100,16 @@ def buscar_equipo(nombre):
             ""
         )
 
-        deporte = entidad.get(
-            "sport",
-            {}
-        ).get(
-            "slug"
-        )
-
         if (
             nombre.lower()
             in nombre_encontrado.lower()
-            and deporte == "football"
         ):
 
             return entidad
 
     return None
+
+
 
 
 # ============================================================
