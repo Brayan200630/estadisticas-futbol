@@ -2,9 +2,9 @@ import streamlit as st
 from datetime import date, datetime
 from curl_cffi import requests
 from urllib.parse import quote
+import streamlit.components.v1 as components
 
 from main import analizar_partido, obtener_estadisticas
-
 
 # ============================================================
 # CONFIGURACIÓN
@@ -16,16 +16,13 @@ st.set_page_config(
     layout="centered"
 )
 
-
 BASE_URL = "https://www.sofascore.com/api/v1"
-
 
 # ============================================================
 # SESIÓN SOFASCORE
 # ============================================================
 
 session = requests.Session()
-
 
 # ============================================================
 # PETICIÓN A SOFASCORE
@@ -614,7 +611,7 @@ def obtener_resultado(evento):
                 "period1"
             )
 
-            away_regular = away_score.get(
+            away_regular = home_score.get(
                 "period1"
             )
 
@@ -903,6 +900,415 @@ def mostrar_partido(evento):
 
 
 # ============================================================
+# GENERAR TEXTO COMPLETO PARA COPIAR
+# ============================================================
+
+def generar_texto_copiable(
+    datos,
+    nombre_a,
+    nombre_b,
+    liga
+):
+
+    lineas = []
+
+    # ========================================================
+    # INFORMACIÓN GENERAL
+    # ========================================================
+
+    lineas.append(
+        f"Equipos: {nombre_a} vs {nombre_b}"
+    )
+
+    lineas.append(
+        f"Liga: {liga}"
+    )
+
+    lineas.append("")
+
+    # ========================================================
+    # FUNCIÓN INTERNA PARA CONSTRUIR PARTIDO
+    # ========================================================
+
+    def texto_partido(
+        titulo,
+        evento
+    ):
+
+        resultado = []
+
+        resultado.append(
+            titulo
+        )
+
+        if not evento:
+
+            resultado.append(
+                "No se encontró un partido válido."
+            )
+
+            resultado.append("")
+
+            return resultado
+
+        local = (
+            evento
+            .get("homeTeam", {})
+            .get("name", "Desconocido")
+        )
+
+        visitante = (
+            evento
+            .get("awayTeam", {})
+            .get("name", "Desconocido")
+        )
+
+        torneo = (
+            evento
+            .get("uniqueTournament", {})
+            .get("name")
+        )
+
+        if not torneo:
+
+            torneo = (
+                evento
+                .get("tournament", {})
+                .get("name")
+            )
+
+        fecha = formatear_fecha(
+            evento
+        )
+
+        marcador = obtener_resultado(
+            evento
+        )
+
+        estadisticas = obtener_estadisticas(
+            evento
+        )
+
+        resultado.append(
+            f"Fecha: {fecha}"
+        )
+
+        resultado.append(
+            f"Partido: "
+            f"{local} vs {visitante}"
+        )
+
+        if torneo:
+
+            resultado.append(
+                f"Liga: {torneo}"
+            )
+
+        if marcador:
+
+            resultado.append(
+                f"Resultado: {marcador}"
+            )
+
+        posesion = estadisticas.get(
+            "Posesión"
+        )
+
+        corners = estadisticas.get(
+            "Córners"
+        )
+
+        faltas = estadisticas.get(
+            "Faltas"
+        )
+
+        tarjetas = estadisticas.get(
+            "Tarjetas amarillas"
+        )
+
+        tiros = estadisticas.get(
+            "Tiros a puerta"
+        )
+
+        fueras = estadisticas.get(
+            "Fueras de juego"
+        )
+
+        if posesion:
+
+            resultado.append(
+                f"Posesión: "
+                f"{local} {posesion[0]} - "
+                f"{posesion[1]} {visitante}"
+            )
+
+        else:
+
+            resultado.append(
+                "Posesión: "
+                "Datos no disponibles"
+            )
+
+        if corners:
+
+            resultado.append(
+                f"Saques de esquina: "
+                f"{local} {corners[0]} - "
+                f"{corners[1]} {visitante}"
+            )
+
+        else:
+
+            resultado.append(
+                "Saques de esquina: "
+                "Datos no disponibles"
+            )
+
+        if faltas:
+
+            resultado.append(
+                f"Faltas: "
+                f"{local} {faltas[0]} - "
+                f"{faltas[1]} {visitante}"
+            )
+
+        else:
+
+            resultado.append(
+                "Faltas: "
+                "Datos no disponibles"
+            )
+
+        if tarjetas:
+
+            resultado.append(
+                f"Tarjetas amarillas: "
+                f"{local} {tarjetas[0]} - "
+                f"{tarjetas[1]} {visitante}"
+            )
+
+        else:
+
+            resultado.append(
+                "Tarjetas amarillas: "
+                "Datos no disponibles"
+            )
+
+        if tiros:
+
+            resultado.append(
+                f"Tiros a puerta: "
+                f"{local} {tiros[0]} - "
+                f"{tiros[1]} {visitante}"
+            )
+
+        else:
+
+            resultado.append(
+                "Tiros a puerta: "
+                "Datos no disponibles"
+            )
+
+        if fueras:
+
+            resultado.append(
+                f"Fueras de juego: "
+                f"{local} {fueras[0]} - "
+                f"{fueras[1]} {visitante}"
+            )
+
+        else:
+
+            resultado.append(
+                "Fueras de juego: "
+                "Datos no disponibles"
+            )
+
+        resultado.append("")
+
+        return resultado
+
+    # ========================================================
+    # H2H
+    # ========================================================
+
+    lineas.append(
+        "🔁 ENFRENTAMIENTOS DIRECTOS"
+    )
+
+    lineas.append("")
+
+    lineas.extend(
+        texto_partido(
+            f"🏠 Último enfrentamiento "
+            f"con {nombre_a} como LOCAL",
+            datos.get("h2h_a_local")
+        )
+    )
+
+    lineas.extend(
+        texto_partido(
+            f"✈️ Último enfrentamiento "
+            f"con {nombre_a} como VISITANTE",
+            datos.get("h2h_a_visitante")
+        )
+    )
+
+    # ========================================================
+    # EQUIPO A
+    # ========================================================
+
+    lineas.append(
+        f"⚽ {nombre_a}"
+    )
+
+    lineas.append("")
+
+    lineas.extend(
+        texto_partido(
+            "🏠 Último partido como LOCAL",
+            datos.get("local_a")
+        )
+    )
+
+    lineas.extend(
+        texto_partido(
+            "✈️ Último partido como VISITANTE",
+            datos.get("visitante_a")
+        )
+    )
+
+    # ========================================================
+    # EQUIPO B
+    # ========================================================
+
+    lineas.append(
+        f"⚽ {nombre_b}"
+    )
+
+    lineas.append("")
+
+    lineas.extend(
+        texto_partido(
+            "🏠 Último partido como LOCAL",
+            datos.get("local_b")
+        )
+    )
+
+    lineas.extend(
+        texto_partido(
+            "✈️ Último partido como VISITANTE",
+            datos.get("visitante_b")
+        )
+    )
+
+    return "\n".join(
+        lineas
+    )
+
+
+# ============================================================
+# BOTÓN COPIAR TEXTO
+# ============================================================
+
+def mostrar_boton_copiar(texto):
+
+    texto_js = (
+        texto
+        .replace("\\", "\\\\")
+        .replace("`", "\\`")
+        .replace("${", "\\${")
+    )
+
+    html = f"""
+    <button
+        onclick="copiarTexto()"
+        style="
+            width: 100%;
+            padding: 10px 16px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            background: white;
+            color: black;
+            cursor: pointer;
+        "
+    >
+        📋 Copiar texto completo
+    </button>
+
+    <script>
+
+    function copiarTexto() {{
+
+        const texto = `{texto_js}`;
+
+        navigator.clipboard.writeText(texto)
+            .then(() => {{
+
+                const boton =
+                    document.querySelector("button");
+
+                boton.innerText =
+                    "✅ Texto copiado";
+
+                setTimeout(() => {{
+
+                    boton.innerText =
+                        "📋 Copiar texto completo";
+
+                }}, 2000);
+
+            }})
+            .catch(() => {{
+
+                const area =
+                    document.createElement("textarea");
+
+                area.value = texto;
+
+                document.body.appendChild(
+                    area
+                );
+
+                area.select();
+
+                document.execCommand(
+                    "copy"
+                );
+
+                document.body.removeChild(
+                    area
+                );
+
+                const boton =
+                    document.querySelector("button");
+
+                boton.innerText =
+                    "✅ Texto copiado";
+
+                setTimeout(() => {{
+
+                    boton.innerText =
+                        "📋 Copiar texto completo";
+
+                }}, 2000);
+
+            }});
+
+    }}
+
+    </script>
+    """
+
+    components.html(
+        html,
+        height=55
+    )
+
+
+# ============================================================
 # BOTÓN
 # ============================================================
 
@@ -1114,6 +1520,21 @@ if st.button(
         st.info(
             f"Liga seleccionada: **{liga}**"
         )
+
+    # ========================================================
+    # BOTÓN PARA COPIAR TODO EL TEXTO
+    # ========================================================
+
+    texto_completo = generar_texto_copiable(
+        datos,
+        nombre_a,
+        nombre_b,
+        liga
+    )
+
+    mostrar_boton_copiar(
+        texto_completo
+    )
 
     # ========================================================
     # H2H
