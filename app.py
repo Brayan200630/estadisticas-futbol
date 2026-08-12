@@ -3,6 +3,7 @@ from datetime import date
 
 from main import analizar_partido, obtener_estadisticas
 
+
 # ============================================================
 # CONFIGURACIÓN
 # ============================================================
@@ -40,6 +41,21 @@ equipo_b = st.text_input(
     placeholder="Ejemplo: Zhejiang"
 )
 
+
+# ============================================================
+# LIGA
+# ============================================================
+
+liga = st.text_input(
+    "Liga",
+    placeholder="Ejemplo: Chinese Super League"
+)
+
+
+# ============================================================
+# FECHA
+# ============================================================
+
 fecha_partido = st.date_input(
     "Fecha del partido",
     value=date.today()
@@ -55,6 +71,10 @@ if st.button(
     use_container_width=True
 ):
 
+    # ========================================================
+    # VALIDACIONES
+    # ========================================================
+
     if not equipo_a.strip():
 
         st.error(
@@ -62,6 +82,7 @@ if st.button(
         )
 
         st.stop()
+
 
     if not equipo_b.strip():
 
@@ -71,20 +92,56 @@ if st.button(
 
         st.stop()
 
+
+    if not liga.strip():
+
+        st.error(
+            "Escribe la liga."
+        )
+
+        st.stop()
+
+
+    # ========================================================
+    # BÚSQUEDA
+    # ========================================================
+
     with st.spinner(
         "Buscando información en Sofascore..."
     ):
-            print("===== INICIO DE BUSQUEDA =====")
-    print("Equipo A:", equipo_a.strip())
-    print("Equipo B:", equipo_b.strip())
-    print("Fecha:", fecha_partido)
 
-    datos = analizar_partido(
+        print(
+            "===== INICIO DE BUSQUEDA ====="
+        )
+
+        print(
+            "Equipo A:",
+            equipo_a.strip()
+        )
+
+        print(
+            "Equipo B:",
+            equipo_b.strip()
+        )
+
+        print(
+            "Liga:",
+            liga.strip()
+        )
+
+        print(
+            "Fecha:",
+            fecha_partido
+        )
+
+
+        datos = analizar_partido(
             equipo_a.strip(),
             equipo_b.strip(),
             fecha_partido.strftime(
                 "%Y-%m-%d"
-            )
+            ),
+            liga.strip()
         )
 
 
@@ -102,6 +159,7 @@ if st.button(
 
 
     nombre_a = datos["equipo_a"]
+
     nombre_b = datos["equipo_b"]
 
 
@@ -112,6 +170,10 @@ if st.button(
     st.success(
         f"Equipos encontrados: "
         f"{nombre_a} vs {nombre_b}"
+    )
+
+    st.info(
+        f"Liga seleccionada: {liga}"
     )
 
 
@@ -133,6 +195,7 @@ if st.button(
         fecha = evento.get(
             "startTimestamp"
         )
+
 
         if fecha:
 
@@ -159,11 +222,30 @@ if st.button(
             .get("name", "")
         )
 
+
         visitante = (
             evento
             .get("awayTeam", {})
             .get("name", "")
         )
+
+
+        # ====================================================
+        # TORNEO / LIGA DEL PARTIDO
+        # ====================================================
+
+        torneo = (
+            evento
+            .get("tournament", {})
+            .get("name")
+        )
+
+
+        if torneo:
+
+            st.write(
+                f"**Liga:** {torneo}"
+            )
 
 
         # ====================================================
@@ -176,6 +258,7 @@ if st.button(
             .get("current")
         )
 
+
         away_score = (
             evento
             .get("awayScore", {})
@@ -186,6 +269,7 @@ if st.button(
         st.write(
             f"**Fecha:** {fecha_formateada}"
         )
+
 
         st.write(
             f"**Partido:** "
@@ -238,6 +322,10 @@ if st.button(
         )
 
 
+        # ====================================================
+        # POSESIÓN
+        # ====================================================
+
         if posesion:
 
             st.write(
@@ -253,6 +341,10 @@ if st.button(
                 "Datos no disponibles"
             )
 
+
+        # ====================================================
+        # CÓRNERS
+        # ====================================================
 
         if corners:
 
@@ -270,6 +362,10 @@ if st.button(
             )
 
 
+        # ====================================================
+        # FALTAS
+        # ====================================================
+
         if faltas:
 
             st.write(
@@ -285,6 +381,10 @@ if st.button(
                 "Datos no disponibles"
             )
 
+
+        # ====================================================
+        # TARJETAS
+        # ====================================================
 
         if tarjetas:
 
@@ -302,6 +402,10 @@ if st.button(
             )
 
 
+        # ====================================================
+        # TIROS A PUERTA
+        # ====================================================
+
         if tiros:
 
             st.write(
@@ -317,6 +421,10 @@ if st.button(
                 "Datos no disponibles"
             )
 
+
+        # ====================================================
+        # FUERAS DE JUEGO
+        # ====================================================
 
         if fueras:
 
@@ -361,7 +469,6 @@ if st.button(
             h2h[0]
         )
 
-
     else:
 
         st.info(
@@ -382,7 +489,7 @@ if st.button(
 
 
     # ========================================================
-    # WUHAN / EQUIPO A
+    # EQUIPO A
     # ========================================================
 
     st.divider()
@@ -400,6 +507,7 @@ if st.button(
         "Las estadísticas fueron las siguientes:"
     )
 
+
     mostrar_partido(
         datos.get("local_a")
     )
@@ -413,13 +521,14 @@ if st.button(
         "Las estadísticas fueron las siguientes:"
     )
 
+
     mostrar_partido(
         datos.get("visitante_a")
     )
 
 
     # ========================================================
-    # ZHEJIANG / EQUIPO B
+    # EQUIPO B
     # ========================================================
 
     st.divider()
@@ -437,6 +546,7 @@ if st.button(
         "Las estadísticas fueron las siguientes:"
     )
 
+
     mostrar_partido(
         datos.get("local_b")
     )
@@ -449,6 +559,7 @@ if st.button(
     st.write(
         "Las estadísticas fueron las siguientes:"
     )
+
 
     mostrar_partido(
         datos.get("visitante_b")
