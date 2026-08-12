@@ -58,14 +58,21 @@ def buscar_equipo(nombre):
     datos = obtener_json(url)
 
     if not datos:
+        print("SOFASCORE NO DEVOLVIÓ DATOS")
+        print("URL:", url)
         return None
+
+    print("RESPUESTA SEARCH:")
+    print(datos)
 
     resultados = datos.get(
         "results",
         []
     )
 
-    # Primero buscamos coincidencia exacta
+    print("RESULTADOS ENCONTRADOS:", len(resultados))
+
+    # Coincidencia exacta
     for resultado in resultados:
 
         entidad = resultado.get(
@@ -78,6 +85,11 @@ def buscar_equipo(nombre):
             ""
         )
 
+        print(
+            "Equipo encontrado:",
+            nombre_encontrado
+        )
+
         if (
             nombre_encontrado.lower()
             == nombre.lower()
@@ -85,8 +97,7 @@ def buscar_equipo(nombre):
 
             return entidad
 
-    # Si no hay coincidencia exacta,
-    # buscamos coincidencia parcial
+    # Coincidencia parcial
     for resultado in resultados:
 
         entidad = resultado.get(
@@ -107,7 +118,6 @@ def buscar_equipo(nombre):
             return entidad
 
     return None
-
 
 
 
