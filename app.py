@@ -74,6 +74,10 @@ if st.button(
     with st.spinner(
         "Buscando información en Sofascore..."
     ):
+            print("===== INICIO DE BUSQUEDA =====")
+    print("Equipo A:", equipo_a.strip())
+    print("Equipo B:", equipo_b.strip())
+    print("Fecha:", fecha_partido)
 
         datos = analizar_partido(
             equipo_a.strip(),
