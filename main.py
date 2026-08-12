@@ -1,5 +1,5 @@
 from curl_cffi import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 
@@ -183,7 +183,8 @@ def obtener_fecha(evento):
     try:
 
         return datetime.fromtimestamp(
-            int(timestamp)
+            int(timestamp),
+            tz=timezone.utc
         )
 
     except Exception:
@@ -253,6 +254,31 @@ def convertir_fecha_limite(fecha_limite):
 
 
 # ============================================================
+# OBTENER TIMESTAMP
+# ============================================================
+
+def obtener_timestamp(evento):
+
+    if not evento:
+        return 0
+
+    timestamp = evento.get(
+        "startTimestamp"
+    )
+
+    if timestamp is None:
+        return 0
+
+    try:
+
+        return int(timestamp)
+
+    except Exception:
+
+        return 0
+
+
+# ============================================================
 # PARTIDO ANTERIOR A FECHA
 # ============================================================
 
@@ -274,18 +300,6 @@ def es_anterior_a_fecha(
 
     if not fecha_limite_date:
         return False
-
-    # IMPORTANTE:
-    #
-    # SOLO partidos estrictamente anteriores
-    # al partido que estamos analizando.
-    #
-    # Si el partido es 12/08/2026:
-    #
-    # 11/08/2026 -> válido
-    # 01/08/2026 -> válido
-    # 12/08/2026 -> NO válido
-    # 13/08/2026 -> NO válido
 
     return fecha_evento < fecha_limite_date
 
@@ -352,10 +366,6 @@ def obtener_nombre_liga(evento):
     if not evento:
         return ""
 
-    # --------------------------------------------------------
-    # uniqueTournament
-    # --------------------------------------------------------
-
     unique = evento.get(
         "uniqueTournament",
         {}
@@ -374,10 +384,6 @@ def obtener_nombre_liga(evento):
         if nombre:
             return nombre
 
-    # --------------------------------------------------------
-    # tournament
-    # --------------------------------------------------------
-
     tournament = evento.get(
         "tournament",
         {}
@@ -395,10 +401,6 @@ def obtener_nombre_liga(evento):
 
         if nombre:
             return nombre
-
-        # ----------------------------------------------------
-        # uniqueTournament dentro de tournament
-        # ----------------------------------------------------
 
         unique = tournament.get(
             "uniqueTournament",
@@ -472,29 +474,21 @@ def pertenece_a_liga(
         liga
     )
 
-    print(
-        "LIGA EVENTO:",
-        repr(nombre_liga),
-        "| LIGA BUSCADA:",
-        repr(liga_buscada)
-    )
-
     if not nombre_liga:
         return False
 
     if not liga_buscada:
         return False
 
-    # Coincidencia exacta
     if nombre_liga == liga_buscada:
         return True
 
-    # Coincidencia parcial
     if (
         liga_buscada in nombre_liga
         or
         nombre_liga in liga_buscada
     ):
+
         return True
 
     return False
@@ -594,11 +588,7 @@ def ordenar_por_fecha(eventos):
     )
 
     eventos.sort(
-        key=lambda evento:
-        evento.get(
-            "startTimestamp",
-            0
-        ),
+        key=obtener_timestamp,
         reverse=True
     )
 
@@ -641,13 +631,12 @@ def es_enfrentamiento(
 
 
 # ============================================================
-# H2H FILTRADO DESDE HISTORIALES
+# H2H POR LOCALÍA
 #
 # Devuelve:
 #
-# 1. Último enfrentamiento con Equipo A LOCAL
-# 2. Último enfrentamiento con Equipo A VISITANTE
-#
+# 1. Último enfrentamiento con A LOCAL
+# 2. Último enfrentamiento con A VISITANTE
 # ============================================================
 
 def obtener_h2h_por_localia(
@@ -661,10 +650,6 @@ def obtener_h2h_por_localia(
 
     candidatos = []
 
-    # ========================================================
-    # UNIR HISTORIALES
-    # ========================================================
-
     todos = []
 
     todos.extend(
@@ -675,54 +660,38 @@ def obtener_h2h_por_localia(
         historial_b
     )
 
-    # ========================================================
-    # FILTRAR
-    # ========================================================
-
     for evento in todos:
 
         if not evento:
             continue
 
-        # Deben ser exactamente los dos equipos
         if not es_enfrentamiento(
             evento,
             equipo_a_id,
             equipo_b_id
         ):
-
             continue
 
-        # Debe estar terminado
         if not partido_valido(
             evento
         ):
-
             continue
 
-        # Debe ser anterior al partido futuro
         if not es_anterior_a_fecha(
             evento,
             fecha_limite
         ):
-
             continue
 
-        # Debe pertenecer a la liga seleccionada
         if not pertenece_a_liga(
             evento,
             liga
         ):
-
             continue
 
         candidatos.append(
             evento
         )
-
-    # ========================================================
-    # ORDENAR
-    # ========================================================
 
     candidatos = ordenar_por_fecha(
         candidatos
@@ -739,47 +708,25 @@ def obtener_h2h_por_localia(
 
     for evento in candidatos:
 
-        fecha = obtener_fecha_date(
-            evento
-        )
-
-        local_id = (
+        print(
+            obtener_fecha_date(evento),
+            "|",
             evento
             .get("homeTeam", {})
-            .get("id")
-        )
-
-        local = (
-            evento
-            .get("homeTeam", {})
-            .get("name")
-        )
-
-        visitante = (
+            .get("name"),
+            "vs",
             evento
             .get("awayTeam", {})
             .get("name")
-        )
-
-        print(
-            fecha,
-            "|",
-            local,
-            "vs",
-            visitante,
-            "| A LOCAL:",
-            local_id == equipo_a_id
         )
 
     print(
         "===================================="
     )
 
-    # ========================================================
-    # ÚLTIMO A COMO LOCAL
-    # ========================================================
-
     h2h_a_local = None
+
+    h2h_a_visitante = None
 
     for evento in candidatos:
 
@@ -789,29 +736,33 @@ def obtener_h2h_por_localia(
             .get("id")
         )
 
-        if home_id == equipo_a_id:
-
-            h2h_a_local = evento
-
-            break
-
-    # ========================================================
-    # ÚLTIMO A COMO VISITANTE
-    # ========================================================
-
-    h2h_a_visitante = None
-
-    for evento in candidatos:
-
         away_id = (
             evento
             .get("awayTeam", {})
             .get("id")
         )
 
-        if away_id == equipo_a_id:
+        if (
+            h2h_a_local is None
+            and
+            home_id == equipo_a_id
+        ):
+
+            h2h_a_local = evento
+
+        if (
+            h2h_a_visitante is None
+            and
+            away_id == equipo_a_id
+        ):
 
             h2h_a_visitante = evento
+
+        if (
+            h2h_a_local is not None
+            and
+            h2h_a_visitante is not None
+        ):
 
             break
 
@@ -839,27 +790,21 @@ def ultimo_local(
         if not evento:
             continue
 
-        # Partido terminado
         if not partido_valido(
             evento
         ):
-
             continue
 
-        # Partido anterior a la fecha seleccionada
         if not es_anterior_a_fecha(
             evento,
             fecha_limite
         ):
-
             continue
 
-        # Misma liga
         if not pertenece_a_liga(
             evento,
             liga
         ):
-
             continue
 
         home_id = (
@@ -874,9 +819,6 @@ def ultimo_local(
         candidatos.append(
             evento
         )
-
-    # IMPORTANTE:
-    # primero filtramos y después ordenamos.
 
     candidatos = ordenar_por_fecha(
         candidatos
@@ -922,27 +864,21 @@ def ultimo_visitante(
         if not evento:
             continue
 
-        # Partido terminado
         if not partido_valido(
             evento
         ):
-
             continue
 
-        # Partido anterior a fecha seleccionada
         if not es_anterior_a_fecha(
             evento,
             fecha_limite
         ):
-
             continue
 
-        # Misma liga
         if not pertenece_a_liga(
             evento,
             liga
         ):
-
             continue
 
         away_id = (
@@ -1011,7 +947,6 @@ def obtener_estadisticas(evento):
     if not partido_valido(
         evento
     ):
-
         return resultado
 
     event_id = evento.get(
@@ -1040,10 +975,6 @@ def obtener_estadisticas(evento):
 
     periodo = None
 
-    # ========================================================
-    # BUSCAR ALL
-    # ========================================================
-
     for item in periodos:
 
         if item.get(
@@ -1053,10 +984,6 @@ def obtener_estadisticas(evento):
             periodo = item
 
             break
-
-    # ========================================================
-    # RESPALDO
-    # ========================================================
 
     if periodo is None:
 
@@ -1074,10 +1001,6 @@ def obtener_estadisticas(evento):
     )
 
     estadisticas = {}
-
-    # ========================================================
-    # EXTRAER ESTADÍSTICAS
-    # ========================================================
 
     for grupo in grupos:
 
@@ -1119,10 +1042,6 @@ def obtener_estadisticas(evento):
         "offsides":
             "Fueras de juego"
     }
-
-    # ========================================================
-    # CONVERTIR
-    # ========================================================
 
     for (
         nombre_api,
@@ -1191,7 +1110,7 @@ def analizar_partido(
         }
 
     # ========================================================
-    # NORMALIZAR FECHA
+    # FECHA
     # ========================================================
 
     fecha_limite = convertir_fecha_limite(
@@ -1310,11 +1229,8 @@ def analizar_partido(
     # ========================================================
     # H2H
     #
-    # Último:
-    #
-    # A LOCAL
-    #
-    # A VISITANTE
+    # ÚLTIMO A LOCAL
+    # ÚLTIMO A VISITANTE
     # ========================================================
 
     (
@@ -1375,9 +1291,6 @@ def analizar_partido(
 
     # ========================================================
     # H2H COMO LISTA
-    #
-    # Mantenemos "h2h" para que app.py pueda seguir
-    # funcionando.
     # ========================================================
 
     h2h = []
@@ -1405,7 +1318,7 @@ def analizar_partido(
         )
 
     # ========================================================
-    # DEBUG FINAL
+    # DEBUG
     # ========================================================
 
     print(
@@ -1467,6 +1380,10 @@ def analizar_partido(
     print(
         "===================================="
     )
+
+    # ========================================================
+    # RESULTADO
+    # ========================================================
 
     return {
 
