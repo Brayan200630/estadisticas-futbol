@@ -351,6 +351,12 @@ def pertenece_a_liga(evento, liga):
     if not evento:
         return False
 
+    liga_buscada = liga.strip().lower()
+
+    # ========================================================
+    # INTENTAR uniqueTournament
+    # ========================================================
+
     torneo = evento.get(
         "uniqueTournament",
         {}
@@ -360,6 +366,48 @@ def pertenece_a_liga(evento, liga):
         "name",
         ""
     )
+
+    # ========================================================
+    # SI NO EXISTE, INTENTAR tournament
+    # ========================================================
+
+    if not nombre_liga:
+
+        torneo = evento.get(
+            "tournament",
+            {}
+        )
+
+        nombre_liga = torneo.get(
+            "name",
+            ""
+        )
+
+    # ========================================================
+    # SI NO EXISTE, INTENTAR UNIQUE TOURNAMENT DENTRO
+    # DE TOURNAMENT
+    # ========================================================
+
+    if not nombre_liga:
+
+        torneo = evento.get(
+            "tournament",
+            {}
+        )
+
+        unique = torneo.get(
+            "uniqueTournament",
+            {}
+        )
+
+        nombre_liga = unique.get(
+            "name",
+            ""
+        )
+
+    # ========================================================
+    # MOSTRAR PARA DEPURACIÓN
+    # ========================================================
 
     print(
         "LIGA ENCONTRADA:",
@@ -371,11 +419,31 @@ def pertenece_a_liga(evento, liga):
     if not nombre_liga:
         return False
 
-    return (
-        nombre_liga.strip().lower()
-        ==
-        liga.strip().lower()
+    nombre_liga = (
+        nombre_liga
+        .strip()
+        .lower()
     )
+
+    # ========================================================
+    # COINCIDENCIA EXACTA
+    # ========================================================
+
+    if nombre_liga == liga_buscada:
+        return True
+
+    # ========================================================
+    # COINCIDENCIA PARCIAL
+    # ========================================================
+
+    if (
+        liga_buscada in nombre_liga
+        or
+        nombre_liga in liga_buscada
+    ):
+        return True
+
+    return False
 
 # ============================================================
 # OBTENER NOMBRE DE LIGA
@@ -426,6 +494,11 @@ def obtener_historial(team_id):
             "events",
             []
         )
+
+        print("====================================")
+        print("PRIMER EVENTO RECIBIDO")
+        print(eventos[0] if eventos else "SIN EVENTOS")
+        print("====================================")
 
         if not eventos:
             break
