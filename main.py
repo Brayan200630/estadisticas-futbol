@@ -2,7 +2,6 @@ from curl_cffi import requests
 from datetime import datetime
 from urllib.parse import quote
 
-
 # ============================================================
 # CONFIGURACIÓN
 # ============================================================
@@ -10,7 +9,6 @@ from urllib.parse import quote
 BASE_URL = "https://www.sofascore.com/api/v1"
 
 # No buscar partidos anteriores a esta fecha
-
 FECHA_MINIMA = datetime.strptime(
     "2020-01-01",
     "%Y-%m-%d"
@@ -173,9 +171,6 @@ def buscar_equipo(nombre):
 
 # ============================================================
 # BUSCAR EQUIPOS
-#
-# Devuelve varios equipos para que app.py pueda crear
-# un buscador/autocompletado.
 # ============================================================
 
 def buscar_equipos(texto):
@@ -296,12 +291,6 @@ def buscar_equipos(texto):
 
 # ============================================================
 # BUSCAR LIGAS / COMPETICIONES
-#
-# También incluye:
-#
-# 🌎 Todas las competiciones
-#
-# con ID None.
 # ============================================================
 
 def buscar_ligas(texto):
@@ -368,9 +357,6 @@ def buscar_ligas(texto):
             ""
         )
 
-        # SofaScore puede devolver distintos tipos
-        # relacionados con competiciones.
-
         if tipo not in {
             "uniqueTournament",
             "tournament"
@@ -386,10 +372,6 @@ def buscar_ligas(texto):
         if not entidad:
             continue
 
-        # ====================================================
-        # UNIQUE TOURNAMENT DIRECTO
-        # ====================================================
-
         tournament_id = entidad.get(
             "id"
         )
@@ -397,6 +379,12 @@ def buscar_ligas(texto):
         nombre = entidad.get(
             "name"
         )
+
+        if not tournament_id:
+            continue
+
+        if not nombre:
+            continue
 
         # ====================================================
         # SI VIENE DENTRO DE TOURNAMENT
@@ -425,9 +413,6 @@ def buscar_ligas(texto):
                     )
 
         if not tournament_id:
-            continue
-
-        if not nombre:
             continue
 
         ligas.append({
@@ -563,11 +548,6 @@ def convertir_fecha_limite(
 
 # ============================================================
 # FECHA VÁLIDA
-#
-# El partido debe:
-#
-# - ser posterior o igual a 01/01/2020
-# - ser anterior a la fecha seleccionada
 # ============================================================
 
 def es_fecha_valida(
@@ -668,10 +648,6 @@ def obtener_nombre_liga(evento):
     if not evento:
         return ""
 
-    # --------------------------------------------------------
-    # uniqueTournament
-    # --------------------------------------------------------
-
     unique = evento.get(
         "uniqueTournament",
         {}
@@ -689,10 +665,6 @@ def obtener_nombre_liga(evento):
 
         if nombre:
             return nombre
-
-    # --------------------------------------------------------
-    # tournament
-    # --------------------------------------------------------
 
     tournament = evento.get(
         "tournament",
@@ -742,10 +714,6 @@ def obtener_unique_tournament_id(evento):
     if not evento:
         return None
 
-    # --------------------------------------------------------
-    # uniqueTournament directamente
-    # --------------------------------------------------------
-
     unique = evento.get(
         "uniqueTournament",
         {}
@@ -762,10 +730,6 @@ def obtener_unique_tournament_id(evento):
 
         if tournament_id:
             return tournament_id
-
-    # --------------------------------------------------------
-    # tournament
-    # --------------------------------------------------------
 
     tournament = evento.get(
         "tournament",
@@ -799,23 +763,12 @@ def obtener_unique_tournament_id(evento):
 
 # ============================================================
 # OBTENER COMPETICIÓN DE UN EVENTO
-#
-# Devuelve:
-#
-# {
-#     "id": 123,
-#     "name": "Liga 1"
-# }
 # ============================================================
 
 def obtener_competicion(evento):
 
     if not evento:
         return None
-
-    # --------------------------------------------------------
-    # uniqueTournament directamente
-    # --------------------------------------------------------
 
     unique = evento.get(
         "uniqueTournament",
@@ -847,10 +800,6 @@ def obtener_competicion(evento):
                     nombre
 
             }
-
-    # --------------------------------------------------------
-    # tournament
-    # --------------------------------------------------------
 
     tournament = evento.get(
         "tournament",
@@ -897,6 +846,38 @@ def obtener_competicion(evento):
 
 
 # ============================================================
+# COMPROBAR COMPETICIÓN
+# ============================================================
+
+def pertenece_a_competicion(
+    evento,
+    tournament_id
+):
+
+    # ========================================================
+    # TODAS LAS COMPETICIONES
+    # ========================================================
+
+    if tournament_id is None:
+
+        return True
+
+    competicion = obtener_competicion(
+        evento
+    )
+
+    if not competicion:
+
+        return False
+
+    return (
+        competicion.get("id")
+        ==
+        tournament_id
+    )
+
+
+# ============================================================
 # NORMALIZAR TEXTO
 # ============================================================
 
@@ -933,83 +914,17 @@ def normalizar_texto(texto):
 
 
 # ============================================================
-# COMPROBAR SI SE SELECCIONÓ
-# TODAS LAS COMPETICIONES
-# ============================================================
-
-def es_todas_las_competiciones(liga):
-
-    if not liga:
-        return False
-
-    liga_normalizada = normalizar_texto(
-        liga
-    )
-
-    return liga_normalizada in {
-
-        "🌎 todas las competiciones",
-
-        "todas las competiciones",
-
-        "todas",
-
-        "all",
-
-        "all competitions"
-
-    }
-
-
-# ============================================================
-# COMPROBAR COMPETICIÓN
-#
-# Si tournament_id es None:
-#
-# TODAS LAS COMPETICIONES
-#
-# Si tiene un ID:
-#
-# SOLO ESA COMPETICIÓN
-# ============================================================
-
-def pertenece_a_competicion(
-    evento,
-    tournament_id
-):
-
-    # --------------------------------------------------------
-    # TODAS LAS COMPETICIONES
-    # --------------------------------------------------------
-
-    if tournament_id is None:
-
-        return True
-
-    # --------------------------------------------------------
-    # OBTENER COMPETICIÓN
-    # --------------------------------------------------------
-
-    competicion = obtener_competicion(
-        evento
-    )
-
-    if not competicion:
-
-        return False
-
-    return (
-        competicion.get("id")
-        ==
-        tournament_id
-    )
-
-
-# ============================================================
 # COMPROBAR LIGA POR NOMBRE
 #
-# Si se selecciona Todas las competiciones:
-# no se aplica filtro de liga.
+# IMPORTANTE:
+#
+# Si liga está vacía:
+#
+# TODAS LAS COMPETICIONES
+#
+# Si liga tiene nombre:
+#
+# SOLO ESA COMPETICIÓN
 # ============================================================
 
 def pertenece_a_liga(
@@ -1020,19 +935,17 @@ def pertenece_a_liga(
     if not evento:
         return False
 
+    liga = str(
+        liga or ""
+    ).strip()
+
     # ========================================================
     # TODAS LAS COMPETICIONES
     # ========================================================
 
-    if es_todas_las_competiciones(
-        liga
-    ):
+    if not liga:
 
         return True
-
-    # ========================================================
-    # LIGA ESPECÍFICA
-    # ========================================================
 
     nombre_liga = normalizar_texto(
         obtener_nombre_liga(
@@ -1048,10 +961,9 @@ def pertenece_a_liga(
         return False
 
     if not liga_buscada:
-        return False
+        return True
 
     if nombre_liga == liga_buscada:
-
         return True
 
     if (
@@ -1141,7 +1053,9 @@ def eliminar_duplicados(eventos):
 
         if event_id:
 
-            unicos[event_id] = evento
+            unicos[
+                event_id
+            ] = evento
 
     return list(
         unicos.values()
@@ -1150,10 +1064,6 @@ def eliminar_duplicados(eventos):
 
 # ============================================================
 # ORDENAR POR FECHA
-#
-# FECHA MÁS RECIENTE
-# ↓
-# FECHA MÁS ANTIGUA
 # ============================================================
 
 def ordenar_por_fecha(eventos):
@@ -1211,6 +1121,12 @@ def es_enfrentamiento(
 
 # ============================================================
 # IDENTIFICAR TORNEO REAL DE LA LIGA
+#
+# SOLO SE UTILIZA CUANDO:
+#
+# liga != ""
+#
+# En "Todas las competiciones" NO se utiliza.
 # ============================================================
 
 def obtener_tournament_id_de_liga(
@@ -1222,35 +1138,13 @@ def obtener_tournament_id_de_liga(
 
     # ========================================================
     # TODAS LAS COMPETICIONES
-    #
-    # No necesitamos identificar un torneo.
     # ========================================================
 
-    if es_todas_las_competiciones(
-        liga
-    ):
-
-        print(
-            "===================================="
-        )
-
-        print(
-            "MODO: TODAS LAS COMPETICIONES"
-        )
-
-        print(
-            "No se aplicará filtro de tournament ID."
-        )
-
-        print(
-            "===================================="
-        )
+    if not str(
+        liga or ""
+    ).strip():
 
         return None
-
-    # ========================================================
-    # LIGA ESPECÍFICA
-    # ========================================================
 
     todos = []
 
@@ -1263,10 +1157,6 @@ def obtener_tournament_id_de_liga(
     )
 
     candidatos = []
-
-    # ========================================================
-    # BUSCAR PARTIDOS RECIENTES DE ESA LIGA
-    # ========================================================
 
     for evento in todos:
 
@@ -1316,10 +1206,6 @@ def obtener_tournament_id_de_liga(
                     )
                 )
             )
-
-    # ========================================================
-    # MÁS RECIENTE PRIMERO
-    # ========================================================
 
     candidatos.sort(
         key=lambda x: x[0],
@@ -1373,13 +1259,15 @@ def obtener_tournament_id_de_liga(
 # ============================================================
 # H2H POR LOCALÍA
 #
-# DEVUELVE:
+# CAMBIO IMPORTANTE:
 #
-# 1. Último enfrentamiento con Equipo A LOCAL
-# 2. Último enfrentamiento con Equipo A VISITANTE
+# Si liga está vacía:
 #
-# Si liga = Todas las competiciones:
-# no filtra por competición.
+# NO SE FILTRA POR COMPETICIÓN.
+#
+# Si liga tiene nombre:
+#
+# SE FILTRA POR LA COMPETICIÓN.
 # ============================================================
 
 def obtener_h2h_por_localia(
@@ -1391,40 +1279,40 @@ def obtener_h2h_por_localia(
     fecha_limite
 ):
 
+    liga = str(
+        liga or ""
+    ).strip()
+
     # ========================================================
     # IDENTIFICAR COMPETICIÓN
+    #
+    # SOLO SI SE ESPECIFICÓ UNA LIGA
     # ========================================================
 
-    tournament_id_objetivo = (
-        obtener_tournament_id_de_liga(
-            historial_a,
-            historial_b,
-            liga,
-            fecha_limite
-        )
-    )
+    tournament_id_objetivo = None
 
-    # ========================================================
-    # SI ES UNA LIGA ESPECÍFICA Y NO SE ENCONTRÓ
-    # ========================================================
+    if liga:
 
-    if (
-        tournament_id_objetivo is None
-        and
-        not es_todas_las_competiciones(
-            liga
-        )
-    ):
-
-        print(
-            "NO SE ENCONTRÓ EL ID "
-            "DE LA COMPETICIÓN"
+        tournament_id_objetivo = (
+            obtener_tournament_id_de_liga(
+                historial_a,
+                historial_b,
+                liga,
+                fecha_limite
+            )
         )
 
-        return (
-            None,
-            None
-        )
+        if tournament_id_objetivo is None:
+
+            print(
+                "NO SE ENCONTRÓ EL ID "
+                "DE LA COMPETICIÓN"
+            )
+
+            return (
+                None,
+                None
+            )
 
     # ========================================================
     # UNIR HISTORIALES
@@ -1485,15 +1373,10 @@ def obtener_h2h_por_localia(
             continue
 
         # ----------------------------------------------------
-        # FILTRO DE COMPETICIÓN
-        #
-        # Solo se aplica si NO es
-        # Todas las competiciones.
+        # COMPETICIÓN
         # ----------------------------------------------------
 
-        if not es_todas_las_competiciones(
-            liga
-        ):
+        if liga:
 
             tournament_id_evento = (
                 obtener_unique_tournament_id(
@@ -1508,6 +1391,9 @@ def obtener_h2h_por_localia(
             ):
 
                 continue
+
+        # Si liga está vacía,
+        # aquí NO se aplica ningún filtro.
 
         candidatos.append(
             evento
@@ -1527,6 +1413,13 @@ def obtener_h2h_por_localia(
 
     print(
         "===================================="
+    )
+
+    print(
+        "MODO COMPETICIÓN:",
+        "TODAS"
+        if not liga
+        else liga
     )
 
     print(
@@ -1691,8 +1584,9 @@ def obtener_h2h_por_localia(
 # ============================================================
 # ÚLTIMO PARTIDO COMO LOCAL
 #
-# Si liga = Todas las competiciones:
-# busca cualquier competición.
+# CAMBIO IMPORTANTE:
+#
+# liga vacía = TODAS LAS COMPETICIONES
 # ============================================================
 
 def ultimo_local(
@@ -1703,6 +1597,10 @@ def ultimo_local(
 ):
 
     candidatos = []
+
+    liga = str(
+        liga or ""
+    ).strip()
 
     for evento in historial:
 
@@ -1726,14 +1624,21 @@ def ultimo_local(
 
             continue
 
-        # Misma liga o todas las competiciones.
+        # ====================================================
+        # MISMA LIGA
+        #
+        # Si liga está vacía:
+        # NO SE FILTRA.
+        # ====================================================
 
-        if not pertenece_a_liga(
-            evento,
-            liga
-        ):
+        if liga:
 
-            continue
+            if not pertenece_a_liga(
+                evento,
+                liga
+            ):
+
+                continue
 
         home_id = (
             evento
@@ -1747,9 +1652,6 @@ def ultimo_local(
         candidatos.append(
             evento
         )
-
-    # Primero filtramos.
-    # Después ordenamos.
 
     candidatos = ordenar_por_fecha(
         candidatos
@@ -1784,8 +1686,9 @@ def ultimo_local(
 # ============================================================
 # ÚLTIMO PARTIDO COMO VISITANTE
 #
-# Si liga = Todas las competiciones:
-# busca cualquier competición.
+# CAMBIO IMPORTANTE:
+#
+# liga vacía = TODAS LAS COMPETICIONES
 # ============================================================
 
 def ultimo_visitante(
@@ -1796,6 +1699,10 @@ def ultimo_visitante(
 ):
 
     candidatos = []
+
+    liga = str(
+        liga or ""
+    ).strip()
 
     for evento in historial:
 
@@ -1819,14 +1726,21 @@ def ultimo_visitante(
 
             continue
 
-        # Misma liga o todas las competiciones.
+        # ====================================================
+        # MISMA LIGA
+        #
+        # Si liga está vacía:
+        # NO SE FILTRA.
+        # ====================================================
 
-        if not pertenece_a_liga(
-            evento,
-            liga
-        ):
+        if liga:
 
-            continue
+            if not pertenece_a_liga(
+                evento,
+                liga
+            ):
+
+                continue
 
         away_id = (
             evento
@@ -2072,12 +1986,17 @@ def analizar_partido(
             "Debes indicar el Equipo B."
         }
 
-    if not liga.strip():
+    # ========================================================
+    # CAMBIO IMPORTANTE
+    #
+    # LA LIGA PUEDE ESTAR VACÍA.
+    #
+    # Vacía = TODAS LAS COMPETICIONES
+    # ========================================================
 
-        return {
-            "error":
-            "Debes indicar la liga."
-        }
+    liga = str(
+        liga or ""
+    ).strip()
 
     # ========================================================
     # FECHA
@@ -2172,7 +2091,9 @@ def analizar_partido(
 
     print(
         "LIGA:",
-        liga
+        "TODAS LAS COMPETICIONES"
+        if not liga
+        else liga
     )
 
     print(
@@ -2204,14 +2125,13 @@ def analizar_partido(
     # ========================================================
     # H2H
     #
-    # ÚLTIMO A LOCAL
-    # ÚLTIMO A VISITANTE
+    # Si liga = "":
     #
-    # Liga específica:
-    # misma competición.
+    # TODAS LAS COMPETICIONES
     #
-    # Todas las competiciones:
-    # cualquier competición.
+    # Si liga tiene valor:
+    #
+    # SOLO ESA COMPETICIÓN
     # ========================================================
 
     (
@@ -2315,6 +2235,17 @@ def analizar_partido(
     )
 
     print(
+        "MODO COMPETICIÓN:",
+        "TODAS LAS COMPETICIONES"
+        if not liga
+        else liga
+    )
+
+    print(
+        "===================================="
+    )
+
+    print(
         "H2H A LOCAL:"
     )
 
@@ -2395,7 +2326,11 @@ def analizar_partido(
             nombre_b,
 
         "liga":
-            liga,
+            (
+                "TODAS LAS COMPETICIONES"
+                if not liga
+                else liga
+            ),
 
         "fecha_partido":
             fecha_partido_str,
