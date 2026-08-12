@@ -346,10 +346,7 @@ def es_anterior_a_fecha(
 # FILTRO DE LIGA
 # ============================================================
 
-def pertenece_a_liga(
-    evento,
-    liga
-):
+def pertenece_a_liga(evento, liga):
 
     if not evento:
         return False
@@ -364,6 +361,13 @@ def pertenece_a_liga(
         ""
     )
 
+    print(
+        "LIGA ENCONTRADA:",
+        repr(nombre_liga),
+        "| LIGA BUSCADA:",
+        repr(liga)
+    )
+
     if not nombre_liga:
         return False
 
@@ -372,7 +376,6 @@ def pertenece_a_liga(
         ==
         liga.strip().lower()
     )
-
 
 # ============================================================
 # OBTENER NOMBRE DE LIGA
