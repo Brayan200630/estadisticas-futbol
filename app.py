@@ -1,819 +1,177 @@
 import streamlit as st
-from datetime import date, datetime
-
-from main import analizar_partido, obtener_estadisticas
-
+from main import analizar_partido, obtener_estadisticas, obtener_fecha
 
 # ============================================================
-# CONFIGURACIÓN
+# CONFIGURACIÓN DE LA PÁGINA
 # ============================================================
-
 st.set_page_config(
-    page_title="Estadísticas de Fútbol",
+    page_title="Analizador de Partidos - SofaScore",
     page_icon="⚽",
-    layout="centered"
+    layout="wide"
 )
 
+st.title("⚽ Analizador Estadístico de Partidos")
+st.markdown("Herramienta para comparar enfrentamientos previos (H2H) y últimos partidos como local/visitante filtrados por liga.")
 
 # ============================================================
-# TÍTULO
+# FORMULARIO DE ENTRADA
 # ============================================================
-
-st.title("⚽ Estadísticas de Fútbol")
-
-st.write(
-    "Consulta estadísticas de los últimos partidos "
-    "relevantes de dos equipos."
-)
-
-
-# ============================================================
-# DATOS DEL PARTIDO
-# ============================================================
-
-equipo_a = st.text_input(
-    "Equipo A",
-    placeholder="Ejemplo: Universitario"
-)
-
-equipo_b = st.text_input(
-    "Equipo B",
-    placeholder="Ejemplo: Alianza Lima"
-)
-
+with st.form("form_analisis"):
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        equipo_a = st.text_input("Equipo Local (Equipo A)", placeholder="Ej. Alianza Lima")
+        liga = st.text_input("Liga / Torneo", placeholder="Ej. Liga 1")
+        
+    with col2:
+        equipo_b = st.text_input("Equipo Visitante (Equipo B)", placeholder="Ej. Universitario")
+        fecha_partido = st.date_input("Fecha Límite del Partido")
+        
+    submitted = st.form_submit_button("🔍 Analizar Partido", use_container_width=True)
 
 # ============================================================
-# LIGA
+# PROCESAMIENTO Y VISUALIZACIÓN
 # ============================================================
-
-liga = st.text_input(
-    "Liga",
-    placeholder="Ejemplo: Liga 1"
-)
-
-
-# ============================================================
-# FECHA
-# ============================================================
-
-fecha_partido = st.date_input(
-    "Fecha del partido",
-    value=date.today()
-)
-
-
-# ============================================================
-# BOTÓN
-# ============================================================
-
-if st.button(
-    "🔎 Buscar partido",
-    use_container_width=True
-):
-
-    # ========================================================
-    # VALIDACIONES
-    # ========================================================
-
-    if not equipo_a.strip():
-
-        st.error(
-            "Escribe el nombre del Equipo A."
-        )
-
-        st.stop()
-
-
-    if not equipo_b.strip():
-
-        st.error(
-            "Escribe el nombre del Equipo B."
-        )
-
-        st.stop()
-
-
-    if not liga.strip():
-
-        st.error(
-            "Escribe la liga."
-        )
-
-        st.stop()
-
-
-    # ========================================================
-    # FECHA COMO STRING
-    # ========================================================
-
-    fecha_limite = fecha_partido.strftime(
-        "%Y-%m-%d"
-    )
-
-
-    # ========================================================
-    # BÚSQUEDA
-    # ========================================================
-
-    with st.spinner(
-        "Buscando información en Sofascore..."
-    ):
-
-        print(
-            "========================================"
-        )
-
-        print(
-            "INICIO DE BÚSQUEDA"
-        )
-
-        print(
-            "Equipo A:",
-            equipo_a.strip()
-        )
-
-        print(
-            "Equipo B:",
-            equipo_b.strip()
-        )
-
-        print(
-            "Liga:",
-            liga.strip()
-        )
-
-        print(
-            "Fecha límite:",
-            fecha_limite
-        )
-
-        print(
-            "========================================"
-        )
-
-
-        datos = analizar_partido(
-            equipo_a.strip(),
-            equipo_b.strip(),
-            fecha_limite,
-            liga.strip()
-        )
-
-
-    # ========================================================
-    # ERROR
-    # ========================================================
-
-    if not datos:
-
-        st.error(
-            "No se recibieron datos."
-        )
-
-        st.stop()
-
-
-    if "error" in datos:
-
-        st.error(
-            datos["error"]
-        )
-
-        st.stop()
-
-
-    # ========================================================
-    # NOMBRES
-    # ========================================================
-
-    nombre_a = datos.get(
-        "equipo_a",
-        equipo_a
-    )
-
-    nombre_b = datos.get(
-        "equipo_b",
-        equipo_b
-    )
-
-
-    # ========================================================
-    # INFORMACIÓN ENCONTRADA
-    # ========================================================
-
-    st.success(
-        f"Equipos encontrados: "
-        f"{nombre_a} vs {nombre_b}"
-    )
-
-
-    st.info(
-        f"Liga seleccionada: {liga}"
-    )
-
-
-    st.info(
-        f"Solo se mostrarán partidos anteriores al "
-        f"{fecha_partido.strftime('%d/%m/%Y')}."
-    )
-
-
-    # ========================================================
-    # FUNCIÓN PARA MOSTRAR PARTIDO
-    # ========================================================
-
-    def mostrar_partido(evento):
-
-        if not evento:
-
-            st.warning(
-                "No se encontró un partido válido."
-            )
-
-            return
-
-
-        # ====================================================
-        # FECHA
-        # ====================================================
-
-        timestamp = evento.get(
-            "startTimestamp"
-        )
-
-
-        if timestamp:
-
-            try:
-
-                fecha_evento = datetime.fromtimestamp(
-                    timestamp
-                )
-
-                fecha_formateada = (
-                    fecha_evento.strftime(
-                        "%d/%m/%Y"
-                    )
-                )
-
-            except Exception:
-
-                fecha_evento = None
-
-                fecha_formateada = (
-                    "Fecha no disponible"
-                )
-
+if submitted:
+    if not equipo_a or not equipo_b or not liga:
+        st.warning("⚠️ Por favor completa los campos de equipos y la liga.")
+    else:
+        fecha_str = fecha_partido.strftime("%Y-%m-%d")
+        
+        with st.spinner("Consultando datos en SofaScore... Esto puede tomar unos segundos."):
+            resultado = analizar_partido(equipo_a, equipo_b, fecha_str, liga)
+            
+        if "error" in resultado:
+            st.error(f"❌ {resultado['error']}")
         else:
-
-            fecha_evento = None
-
-            fecha_formateada = (
-                "Fecha no disponible"
-            )
-
-
-        # ====================================================
-        # LOCAL
-        # ====================================================
-
-        local = (
-            evento
-            .get("homeTeam", {})
-            .get("name", "")
-        )
-
-
-        # ====================================================
-        # VISITANTE
-        # ====================================================
-
-        visitante = (
-            evento
-            .get("awayTeam", {})
-            .get("name", "")
-        )
-
-
-        # ====================================================
-        # LIGA
-        # ====================================================
-
-        torneo = (
-            evento
-            .get("uniqueTournament", {})
-            .get("name")
-        )
-
-
-        if not torneo:
-
-            torneo = (
-                evento
-                .get("tournament", {})
-                .get("name")
-            )
-
-
-        if torneo:
-
-            st.write(
-                f"**Liga:** {torneo}"
-            )
-
-
-        # ====================================================
-        # FECHA
-        # ====================================================
-
-        st.write(
-            f"**Fecha:** {fecha_formateada}"
-        )
-
-
-        # ====================================================
-        # PARTIDO
-        # ====================================================
-
-        st.write(
-            f"**Partido:** "
-            f"{local} vs {visitante}"
-        )
-
-
-        # ====================================================
-        # RESULTADO
-        # ====================================================
-
-        home_score = (
-            evento
-            .get("homeScore", {})
-            .get("current")
-        )
-
-
-        away_score = (
-            evento
-            .get("awayScore", {})
-            .get("current")
-        )
-
-
-        if (
-            home_score is not None
-            and
-            away_score is not None
-        ):
-
-            st.write(
-                f"**Resultado:** "
-                f"{home_score} - {away_score}"
-            )
-
-
-        # ====================================================
-        # ESTADÍSTICAS
-        # ====================================================
-
-        estadisticas = obtener_estadisticas(
-            evento
-        )
-
-
-        posesion = estadisticas.get(
-            "Posesión"
-        )
-
-        corners = estadisticas.get(
-            "Córners"
-        )
-
-        faltas = estadisticas.get(
-            "Faltas"
-        )
-
-        tarjetas = estadisticas.get(
-            "Tarjetas amarillas"
-        )
-
-        tiros = estadisticas.get(
-            "Tiros a puerta"
-        )
-
-        fueras = estadisticas.get(
-            "Fueras de juego"
-        )
-
-
-        # ====================================================
-        # POSESIÓN
-        # ====================================================
-
-        if posesion:
-
-            st.write(
-                f"**Posesión:** "
-                f"{local} {posesion[0]} - "
-                f"{posesion[1]} {visitante}"
-            )
-
-        else:
-
-            st.write(
-                "**Posesión:** Datos no disponibles"
-            )
-
-
-        # ====================================================
-        # CÓRNERS
-        # ====================================================
-
-        if corners:
-
-            st.write(
-                f"**Saques de esquina:** "
-                f"{local} {corners[0]} - "
-                f"{corners[1]} {visitante}"
-            )
-
-        else:
-
-            st.write(
-                "**Saques de esquina:** "
-                "Datos no disponibles"
-            )
-
-
-        # ====================================================
-        # FALTAS
-        # ====================================================
-
-        if faltas:
-
-            st.write(
-                f"**Faltas:** "
-                f"{local} {faltas[0]} - "
-                f"{faltas[1]} {visitante}"
-            )
-
-        else:
-
-            st.write(
-                "**Faltas:** Datos no disponibles"
-            )
-
-
-        # ====================================================
-        # TARJETAS
-        # ====================================================
-
-        if tarjetas:
-
-            st.write(
-                f"**Tarjetas amarillas:** "
-                f"{local} {tarjetas[0]} - "
-                f"{tarjetas[1]} {visitante}"
-            )
-
-        else:
-
-            st.write(
-                "**Tarjetas amarillas:** "
-                "Datos no disponibles"
-            )
-
-
-        # ====================================================
-        # TIROS A PUERTA
-        # ====================================================
-
-        if tiros:
-
-            st.write(
-                f"**Tiros a puerta:** "
-                f"{local} {tiros[0]} - "
-                f"{tiros[1]} {visitante}"
-            )
-
-        else:
-
-            st.write(
-                "**Tiros a puerta:** "
-                "Datos no disponibles"
-            )
-
-
-        # ====================================================
-        # FUERAS DE JUEGO
-        # ====================================================
-
-        if fueras:
-
-            st.write(
-                f"**Fueras de juego:** "
-                f"{local} {fueras[0]} - "
-                f"{fueras[1]} {visitante}"
-            )
-
-        else:
-
-            st.write(
-                "**Fueras de juego:** "
-                "Datos no disponibles"
-            )
-
-
-    # ========================================================
-    # ENFRENTAMIENTOS DIRECTOS
-    # ========================================================
-
-    st.divider()
-
-    st.header(
-        "🤝 Enfrentamientos directos"
-    )
-
-
-    h2h_original = datos.get(
-        "h2h",
-        []
-    )
-
-
-    # ========================================================
-    # FILTRAR H2H POR FECHA
-    # ========================================================
-
-    h2h = []
-
-
-    for evento in h2h_original:
-
-        if not evento:
-            continue
-
-
-        timestamp = evento.get(
-            "startTimestamp"
-        )
-
-
-        if not timestamp:
-            continue
-
-
-        try:
-
-            fecha_evento = datetime.fromtimestamp(
-                timestamp
-            ).date()
-
-        except Exception:
-
-            continue
-
-
-        # ====================================================
-        # SOLO PARTIDOS ANTERIORES A LA FECHA DEL PARTIDO
-        # ====================================================
-
-        if fecha_evento >= fecha_partido:
-
-            print(
-                "H2H DESCARTADO POR FECHA:",
-                fecha_evento,
-                ">=",
-                fecha_partido
-            )
-
-            continue
-
-
-        # ====================================================
-        # COMPROBAR QUE REALMENTE SEAN LOS DOS EQUIPOS
-        # ====================================================
-
-        home_id = (
-            evento
-            .get("homeTeam", {})
-            .get("id")
-        )
-
-
-        away_id = (
-            evento
-            .get("awayTeam", {})
-            .get("id")
-        )
-
-
-        id_a = datos.get(
-            "equipo_a_id"
-        )
-
-
-        id_b = datos.get(
-            "equipo_b_id"
-        )
-
-
-        # Si main.py entrega IDs, comprobarlos.
-        if id_a and id_b:
-
-            if {home_id, away_id} != {
-                id_a,
-                id_b
-            }:
-
-                continue
-
-
-        h2h.append(
-            evento
-        )
-
-
-    # ========================================================
-    # ELIMINAR DUPLICADOS
-    # ========================================================
-
-    h2h_unicos = {}
-
-
-    for evento in h2h:
-
-        event_id = evento.get(
-            "id"
-        )
-
-        if event_id:
-
-            h2h_unicos[event_id] = evento
-
-
-    h2h = list(
-        h2h_unicos.values()
-    )
-
-
-    # ========================================================
-    # ORDENAR DEL MÁS RECIENTE AL MÁS ANTIGUO
-    # ========================================================
-
-    h2h.sort(
-        key=lambda evento:
-        evento.get(
-            "startTimestamp",
-            0
-        ),
-        reverse=True
-    )
-
-
-    # ========================================================
-    # SOLO LOS 2 MÁS RECIENTES
-    # ========================================================
-
-    h2h = h2h[:2]
-
-
-    # ========================================================
-    # MOSTRAR H2H
-    # ========================================================
-
-    if len(h2h) >= 1:
-
-        st.subheader(
-            "Último enfrentamiento"
-        )
-
-        mostrar_partido(
-            h2h[0]
-        )
-
-
-    if len(h2h) >= 2:
-
-        st.divider()
-
-        st.subheader(
-            "Enfrentamiento anterior"
-        )
-
-        mostrar_partido(
-            h2h[1]
-        )
-
-
-    if len(h2h) == 0:
-
-        st.warning(
-            "No se encontró ningún enfrentamiento "
-            "directo anterior a la fecha seleccionada."
-        )
-
-
-    # ========================================================
-    # EQUIPO A
-    # ========================================================
-
-    st.divider()
-
-    st.header(
-        f"🏠 {nombre_a}"
-    )
-
-
-    # ========================================================
-    # ÚLTIMO COMO LOCAL
-    # ========================================================
-
-    st.subheader(
-        "Último partido como LOCAL"
-    )
-
-
-    st.write(
-        "Las estadísticas fueron las siguientes:"
-    )
-
-
-    mostrar_partido(
-        datos.get(
-            "local_a"
-        )
-    )
-
-
-    # ========================================================
-    # ÚLTIMO COMO VISITANTE
-    # ========================================================
-
-    st.subheader(
-        "Último partido como VISITANTE"
-    )
-
-
-    st.write(
-        "Las estadísticas fueron las siguientes:"
-    )
-
-
-    mostrar_partido(
-        datos.get(
-            "visitante_a"
-        )
-    )
-
-
-    # ========================================================
-    # EQUIPO B
-    # ========================================================
-
-    st.divider()
-
-    st.header(
-        f"✈️ {nombre_b}"
-    )
-
-
-    # ========================================================
-    # ÚLTIMO COMO LOCAL
-    # ========================================================
-
-    st.subheader(
-        "Último partido como LOCAL"
-    )
-
-
-    st.write(
-        "Las estadísticas fueron las siguientes:"
-    )
-
-
-    mostrar_partido(
-        datos.get(
-            "local_b"
-        )
-    )
-
-
-    # ========================================================
-    # ÚLTIMO COMO VISITANTE
-    # ========================================================
-
-    st.subheader(
-        "Último partido como VISITANTE"
-    )
-
-
-    st.write(
-        "Las estadísticas fueron las siguientes:"
-    )
-
-
-    mostrar_partido(
-        datos.get(
-            "visitante_b"
-        )
-    )
+            st.success(f"Encuentros procesados para: **{resultado['equipo_a']}** vs **{resultado['equipo_b']}**")
+            
+            # ----------------------------------------------------
+            # SECCIÓN 1: HISTORIAL H2H
+            # ----------------------------------------------------
+            st.markdown("---")
+            st.subheader("🤝 Historial de Enfrentamientos Directos (H2H)")
+            
+            h2h_partidos = resultado.get("h2h", [])
+            if not h2h_partidos:
+                st.info("No se encontraron enfrentamientos previos directos en esta liga antes de la fecha indicada.")
+            else:
+                for idx, evento in enumerate(h2h_partidos, 1):
+                    fecha_evt = obtener_fecha(evento)
+                    home_name = evento.get("homeTeam", {}).get("name", "")
+                    away_name = evento.get("awayTeam", {}).get("name", "")
+                    
+                    home_score = evento.get("homeScore", {}).get("current", 0)
+                    away_score = evento.get("awayScore", {}).get("current", 0)
+                    
+                    with st.expander(f"Partido {idx}: {home_name} {home_score} - {away_score} {away_name} ({fecha_evt.strftime('%d/%m/%Y') if fecha_evt else 'Fecha desc.'})"):
+                        stats = obtener_estadisticas(evento)
+                        
+                        # Mostrar marcador general
+                        cols = st.columns(3)
+                        cols[1].metric(label=f"{home_name} vs {away_name}", value=f"{home_score} - {away_score}")
+                        
+                        st.markdown("#### Estadísticas del Enfrentamiento")
+                        if not stats or all(v is None for v in stats.values()):
+                            st.text("No hay estadísticas detalladas disponibles para este encuentro.")
+                        else:
+                            for nombre_stat, valores in stats.items():
+                                if valores:
+                                    val_local, val_visitante = valores
+                                    st.markdown(f"**{nombre_stat}:** {home_name} ({val_local}) — ({val_visitante}) {away_name}")
+
+            # ----------------------------------------------------
+            # SECCIÓN 2: RENDIMIENTO RECIENTE (LOCAL / VISITANTE)
+            # ----------------------------------------------------
+            st.markdown("---")
+            st.subheader("📊 Últimos Partidos Contextuales")
+            
+            col_a, col_b = st.columns(2)
+            
+            # --- EQUIPO A ---
+            with col_a:
+                st.markdown(f"### 🏠 {resultado['equipo_a']} (Como Local)")
+                local_evt = resultado.get("local_a")
+                
+                if not local_evt:
+                    st.info("No hay registros recientes como local en esta liga.")
+                else:
+                    f_loc = obtener_fecha(local_evt)
+                    h_n = local_evt.get("homeTeam", {}).get("name")
+                    a_n = local_evt.get("awayTeam", {}).get("name")
+                    h_s = local_evt.get("homeScore", {}).get("current", 0)
+                    a_s = local_evt.get("awayScore", {}).get("current", 0)
+                    
+                    st.write(f"**Fecha:** {f_loc.strftime('%d/%m/%Y') if f_loc else 'N/D'}")
+                    st.write(f"**Resultado:** {h_n} {h_s} - {a_s} {a_n}")
+                    
+                    stats_loc = obtener_estadisticas(local_evt)
+                    with st.expander("Ver estadísticas de local"):
+                        for ns, vs in stats_loc.items():
+                            if vs:
+                                st.text(f"{ns}: Local ({vs[0]}) | Visitante ({vs[1]})")
+
+                st.markdown(f"### ✈️ {resultado['equipo_a']} (Como Visitante)")
+                vis_evt_a = resultado.get("visitante_a")
+                
+                if not vis_evt_a:
+                    st.info("No hay registros recientes como visitante en esta liga.")
+                else:
+                    f_vis = obtener_fecha(vis_evt_a)
+                    h_n = vis_evt_a.get("homeTeam", {}).get("name")
+                    a_n = vis_evt_a.get("awayTeam", {}).get("name")
+                    h_s = vis_evt_a.get("homeScore", {}).get("current", 0)
+                    a_s = vis_evt_a.get("awayScore", {}).get("current", 0)
+                    
+                    st.write(f"**Fecha:** {f_vis.strftime('%d/%m/%Y') if f_vis else 'N/D'}")
+                    st.write(f"**Resultado:** {h_n} {h_s} - {a_s} {a_n}")
+                    
+                    stats_vis_a = obtener_estadisticas(vis_evt_a)
+                    with st.expander("Ver estadísticas de visitante"):
+                        for ns, vs in stats_vis_a.items():
+                            if vs:
+                                st.text(f"{ns}: Local ({vs[0]}) | Visitante ({vs[1]})")
+
+            # --- EQUIPO B ---
+            with col_b:
+                st.markdown(f"### 🏠 {resultado['equipo_b']} (Como Local)")
+                local_evt_b = resultado.get("local_b")
+                
+                if not local_evt_b:
+                    st.info("No hay registros recientes como local en esta liga.")
+                else:
+                    f_loc = obtener_fecha(local_evt_b)
+                    h_n = local_evt_b.get("homeTeam", {}).get("name")
+                    a_n = local_evt_b.get("awayTeam", {}).get("name")
+                    h_s = local_evt_b.get("homeScore", {}).get("current", 0)
+                    a_s = local_evt_b.get("awayScore", {}).get("current", 0)
+                    
+                    st.write(f"**Fecha:** {f_loc.strftime('%d/%m/%Y') if f_loc else 'N/D'}")
+                    st.write(f"**Resultado:** {h_n} {h_s} - {a_s} {a_n}")
+                    
+                    stats_loc_b = obtener_estadisticas(local_evt_b)
+                    with st.expander("Ver estadísticas de local"):
+                        for ns, vs in stats_loc_b.items():
+                            if vs:
+                                st.text(f"{ns}: Local ({vs[0]}) | Visitante ({vs[1]})")
+
+                st.markdown(f"### ✈️ {resultado['equipo_b']} (Como Visitante)")
+                vis_evt_b = resultado.get("visitante_b")
+                
+                if not vis_evt_b:
+                    st.info("No hay registros recientes como visitante en esta liga.")
+                else:
+                    f_vis = obtener_fecha(vis_evt_b)
+                    h_n = vis_evt_b.get("homeTeam", {}).get("name")
+                    a_n = vis_evt_b.get("awayTeam", {}).get("name")
+                    h_s = vis_evt_b.get("homeScore", {}).get("current", 0)
+                    a_s = vis_evt_b.get("awayScore", {}).get("current", 0)
+                    
+                    st.write(f"**Fecha:** {f_vis.strftime('%d/%m/%Y') if f_vis else 'N/D'}")
+                    st.write(f"**Resultado:** {h_n} {h_s} - {a_s} {a_n}")
+                    
+                    stats_vis_b = obtener_estadisticas(vis_evt_b)
+                    with st.expander("Ver estadísticas de visitante"):
+                        for ns, vs in stats_vis_b.items():
+                            if vs:
+                                st.text(f"{ns}: Local ({vs[0]}) | Visitante ({vs[1]})")
