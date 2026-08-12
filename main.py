@@ -26,21 +26,20 @@ def obtener_json(url):
             timeout=20
         )
 
+        print("====================================")
+        print("URL:", url)
+        print("STATUS:", respuesta.status_code)
+        print("RESPUESTA:", respuesta.text[:500])
+        print("====================================")
+
         if respuesta.status_code != 200:
-
-            print(
-                f"HTTP {respuesta.status_code}: {url}"
-            )
-
             return None
 
         return respuesta.json()
 
     except Exception as error:
 
-        print(
-            f"Error consultando Sofascore: {error}"
-        )
+        print("ERROR:", error)
 
         return None
 
