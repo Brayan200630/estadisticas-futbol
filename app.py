@@ -79,7 +79,7 @@ if st.button(
     print("Equipo B:", equipo_b.strip())
     print("Fecha:", fecha_partido)
 
-        datos = analizar_partido(
+    datos = analizar_partido(
             equipo_a.strip(),
             equipo_b.strip(),
             fecha_partido.strftime(
